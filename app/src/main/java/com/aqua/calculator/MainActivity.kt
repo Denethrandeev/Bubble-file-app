@@ -134,8 +134,8 @@ class MainActivity : Activity() {
                     if (expression.isNotEmpty() && expression.last() in "+−×÷") expression = expression.dropLast(1)
                     if (expression.isNotEmpty()) expression += key
                 } else if (key == ".") {
-                    val current = expression.substringAfterLast(Regex("[+−×÷]"))
-                    if (!current.contains(".")) expression += if (current.isEmpty()) "0." else "."
+                    val current = expression.substring(expression.indexOfLast { it in "+−×÷" } + 1)
+                    if (!current.contains(".")) expression += if (current.length == 0) "0." else "."
                 } else expression += key
             }
         }
