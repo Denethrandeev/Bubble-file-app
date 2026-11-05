@@ -28,6 +28,58 @@ const List<Color> aquaAccents = <Color>[
   Color(0xFFFF83C5),
 ];
 
+
+class _LiquidSurfacePainter extends CustomPainter {
+  const _LiquidSurfacePainter({required this.accent, required this.tilt, required this.enabled});
+  final Color accent;
+  final Offset tilt;
+  final bool enabled;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final slope = enabled ? (tilt.dx * .12).clamp(-.13, .13) : 0.0;
+    final base = size.height * .91;
+    final path = Path()..moveTo(0, base + slope * size.height);
+    for (var i = 0; i <= 24; i++) {
+      final x = size.width * i / 24;
+      final wave = math.sin(i / 24 * math.pi * 2) * size.height * .009;
+      path.lineTo(x, base + slope * (x - size.width / 2) + wave);
+    }
+    path
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(path, Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [accent.withOpacity(.16), accent.withOpacity(.30)],
+      ).createShader(Offset.zero & size));
+    final shine = Paint()
+      ..color = accent.withOpacity(.52)
+      ..strokeWidth = 1.1
+      ..style = PaintingStyle.stroke;
+    final surface = Path()..moveTo(0, base + slope * size.height);
+    for (var i = 0; i <= 24; i++) {
+      final x = size.width * i / 24;
+      final wave = math.sin(i / 24 * math.pi * 2) * size.height * .009;
+      surface.lineTo(x, base + slope * (x - size.width / 2) + wave);
+    }
+    canvas.drawPath(surface, shine);
+    for (var i = 0; i < 2; i++) {
+      final x = size.width * (.28 + i * .43) + (enabled ? tilt.dx * 3 : 0);
+      final y = size.height * (.955 - i * .018) + (enabled ? tilt.dy * 2 : 0);
+      canvas.drawCircle(Offset(x, y), size.width * (.009 + i * .003),
+        Paint()..color = Colors.white.withOpacity(.36));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _LiquidSurfacePainter old) =>
+      old.accent != accent || old.tilt != tilt || old.enabled != enabled;
+}
+
 class _StorageDropPainter extends CustomPainter {
   const _StorageDropPainter({
     required this.fraction,
@@ -93,6 +145,9 @@ class _AquaAppState extends State<AquaApp> {
   int _tab = 0;
   int _theme = 0;
   bool _gravity = true;
+  Offset _waterTilt = Offset.zero;
+  Offset? _waterBaseline;
+  StreamSubscription<AccelerometerEvent>? _waterSensor;
   bool _animations = true;
   bool _performance = true;
   double _bubbleSpeed = 1.0;
@@ -128,6 +183,16 @@ class _AquaAppState extends State<AquaApp> {
   @override
   void initState() {
     super.initState();
+    _waterSensor = accelerometerEventStream().listen((event) {
+      _waterBaseline ??= Offset(event.x, event.y);
+      final next = Offset(
+        ((event.x - _waterBaseline!.dx) / 9.8).clamp(-1.0, 1.0).toDouble(),
+        ((event.y - _waterBaseline!.dy) / 9.8).clamp(-1.0, 1.0).toDouble(),
+      );
+      if ((next - _waterTilt).distance > .045 && mounted) {
+        setState(() => _waterTilt = next);
+      }
+    }, onError: (_) {});
     Future<void>.delayed(const Duration(milliseconds: 3200), () {
       if (mounted) setState(() => _showSplash = false);
     });
@@ -955,6 +1020,14 @@ class _AquaAppState extends State<AquaApp> {
 
 
   @override
+  void dispose() {
+    _waterSensor?.cancel();
+    _recycleTimer?.cancel();
+    _mediaAudioPlayer.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final base = _light ? const Color(0xFFEAF5F7) : const Color(0xFF04141E);
     final foreground = _light ? const Color(0xFF102B38) : Colors.white;
@@ -1362,17 +1435,31 @@ class _AquaAppState extends State<AquaApp> {
 
   Widget _glass({required Widget child}) {
     final radius = BorderRadius.circular(23);
-    // On low-RAM phones, avoid a BackdropFilter/compositing layer for every
-    // file row. Keep a translucent glass-like surface without live blur.
+    final content = Stack(
+      children: [
+        Padding(padding: const EdgeInsets.all(15), child: Material(
+          color: Colors.transparent, child: child)),
+        Positioned.fill(child: IgnorePointer(child: CustomPaint(
+          painter: _LiquidSurfacePainter(
+            accent: _accent,
+            tilt: _waterTilt,
+            enabled: _gravity,
+          ),
+        ))),
+      ],
+    );
+    // Keep the water layer lightweight in Performance mode; blur is optional.
     if (_performance) {
-      return Container(
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(.075),
-          borderRadius: radius,
-          border: Border.all(color: Colors.white.withOpacity(.15), width: 1),
+      return ClipRRect(
+        borderRadius: radius,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(.075),
+            borderRadius: radius,
+            border: Border.all(color: Colors.white.withOpacity(.15), width: 1),
+          ),
+          child: content,
         ),
-        child: Material(color: Colors.transparent, child: child),
       );
     }
     return ClipRRect(
@@ -1380,7 +1467,6 @@ class _AquaAppState extends State<AquaApp> {
       child: BackdropFilter(
         filter: ui.ImageFilter.blur(sigmaX: 26, sigmaY: 26),
         child: Container(
-          padding: const EdgeInsets.all(15),
           decoration: BoxDecoration(
             gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
               colors: [Colors.white.withOpacity(.14), Colors.white.withOpacity(.045)]),
@@ -1388,7 +1474,7 @@ class _AquaAppState extends State<AquaApp> {
             border: Border.all(color: Colors.white.withOpacity(.17), width: 1),
             boxShadow: [BoxShadow(color: _accent.withOpacity(.055), blurRadius: 24)],
           ),
-          child: Material(color: Colors.transparent, child: child),
+          child: content,
         ),
       ),
     );
