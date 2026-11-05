@@ -14,7 +14,6 @@ import 'package:latlong2/latlong.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 class AquaAdvancedTools extends StatefulWidget {
   const AquaAdvancedTools({super.key, required this.targetDirectory, required this.accent});
