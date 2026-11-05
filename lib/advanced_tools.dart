@@ -294,7 +294,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
     _say('Scanning accessible photo folders for GPS metadata…');
     final found = <_GeoPhoto>[];
     final pending = <Directory>[];
-    final seen = <String>{};
+    final visitedDirectories = <String>{};
     const imageExtensions = <String>{
       'jpg','jpeg','tif','tiff','heic','heif'
     };
@@ -308,8 +308,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
           await for (final entry in storage.list(followLinks: false)) {
             if (entry is Directory &&
                 entry.path != '/storage/emulated' &&
-                !entry.path.endsWith('/self') &&
-                seen.add(entry.path)) {
+                !entry.path.endsWith('/self')) {
               pending.add(entry);
             }
           }
@@ -318,7 +317,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
 
       while (pending.isNotEmpty && inspected < 1800) {
         final directory = pending.removeLast();
-        if (!seen.add(directory.path) && directory.path != internal.path) continue;
+        if (!visitedDirectories.add(directory.path)) continue;
         try {
           await for (final entity in directory.list(followLinks: false)) {
             if (entity is Directory) {
