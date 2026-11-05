@@ -600,7 +600,7 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
   _Bubble _createBubble({double? y}) {
     final radius = 11 + _random.nextDouble() * (widget.reduced ? 23 : 33);
     final hue = HSLColor.fromColor(widget.accent).hue + _random.nextDouble() * 24 - 12;
-    return _Bubble(radius, radius + _random.nextDouble() * math.max(1, _size.width - radius * 2),
+    return _Bubble(radius, radius + _random.nextDouble() * math.max(1.0, _size.width - radius * 2).toDouble(),
       y ?? _size.height + radius, (_random.nextDouble() - .5) * 1.2,
       -.3 - _random.nextDouble() * 1.1, _random.nextDouble() * math.pi * 2,
       .22 + _random.nextDouble() * .30, hue);
