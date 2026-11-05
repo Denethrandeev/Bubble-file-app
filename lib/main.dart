@@ -742,6 +742,10 @@ class _AquaAppState extends State<AquaApp> {
       if (await _unlockFolderIfNeeded(entity)) await _loadDirectory(entity);
       return;
     }
+    if (entity is! File) {
+      await _showDetails(entity);
+      return;
+    }
     final ext = _extensionOf(entity);
     const audio = <String>{'mp3','wav','m4a','aac','flac','ogg','opus','wma'};
     const video = <String>{'mp4','mkv','mov','webm','3gp','avi','m4v'};
