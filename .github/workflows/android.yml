@@ -14,7 +14,7 @@ jobs:
         with:
           channel: stable
       - name: Create Android platform scaffold
-        run: flutter create --platforms=android --project-name aqua_file_manager .
+        run: flutter create --platforms=android --project-name bubble_file_manager .
       - name: Set Bubble File Manager app label
         run: |
           python3 - <<'PY'
@@ -22,9 +22,9 @@ jobs:
           import re
           path = Path("android/app/src/main/AndroidManifest.xml")
           data = path.read_text()
-          data, count = re.subn(r'<application\\b([^>]*?)android:label="[^"]*"', r'<application\\1android:label="Bubble File Manager"', data, count=1)
+          data, count = re.subn(r'<application\b([^>]*?)android:label="[^"]*"', r'<application\1android:label="Bubble File Manager"', data, count=1)
           if count == 0:
-              data, count = re.subn(r'<application\\b', '<application android:label="Bubble File Manager"', data, count=1)
+              data, count = re.subn(r'<application\b', '<application android:label="Bubble File Manager"', data, count=1)
           if count == 0:
               raise SystemExit("Could not set Android app label")
           path.write_text(data)
