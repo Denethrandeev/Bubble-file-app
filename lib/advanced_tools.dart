@@ -162,6 +162,38 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
       _say('Incorrect PIN.');
       return false;
     }
+    return _setRecoveryAnswerIfMissing();
+  }
+
+  Future<bool> _setRecoveryAnswerIfMissing() async {
+    final existing = await _secure.read(key: 'aqua_vault_recovery_hash');
+    if (existing != null) return true;
+    final answerController = TextEditingController();
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Set up PIN recovery'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Choose a private favourite-animal name as your recovery answer.'),
+          TextField(controller: answerController,
+            decoration: const InputDecoration(labelText: 'Favourite animal name')),
+        ]),
+        actions: [
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Save recovery answer')),
+        ],
+      ),
+    );
+    final answer = _normaliseRecoveryAnswer(answerController.text);
+    answerController.dispose();
+    if (result != true || answer.length < 2) {
+      _say('A recovery answer is required to finish Vault sign-in.');
+      return false;
+    }
+    final record = await _saltedDigest(answer);
+    await _secure.write(key: 'aqua_vault_recovery_salt', value: record.split(':').first);
+    await _secure.write(key: 'aqua_vault_recovery_hash', value: record.split(':').last);
     return true;
   }
 
