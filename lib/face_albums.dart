@@ -133,6 +133,7 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
       _processed = 0;
       _skipped = 0;
       _groups = <_PersonCluster>[];
+      _undoRemovals.clear();
       _status = 'Checking photo access…';
     });
 
@@ -262,8 +263,12 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
       ),
     );
     if (confirmed != true || !mounted || !group.paths.contains(path)) return;
-    setState(() => _undoRemovals.add((group: group, path: path)));
-    sheetSetState(() => group.paths.remove(path));
+    setState(() {
+      _undoRemovals.add((group: group, path: path));
+      group.paths.remove(path);
+      if (group.paths.isEmpty) _groups.remove(group);
+    });
+    sheetSetState(() {});
   }
 
   void _undoLastRemoval() {
@@ -273,6 +278,8 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
       item.group.paths.add(item.path);
       item.group.paths.sort();
     }
+    if (!_groups.contains(item.group)) _groups.add(item.group);
+    _groups.sort((a, b) => b.paths.length.compareTo(a.paths.length));
     setState(() {});
   }
 
@@ -437,6 +444,7 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
             TextButton.icon(
               onPressed: _busy ? null : () => setState(() {
                 _groups = <_PersonCluster>[];
+                _undoRemovals.clear();
                 _status = 'Temporary face groups cleared from memory.';
               }),
               icon: const Icon(Icons.delete_outline),
