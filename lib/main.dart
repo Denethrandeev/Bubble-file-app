@@ -16,6 +16,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/services.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:video_player/video_player.dart';
 
 void main() => runApp(const AquaApp());
 
@@ -117,6 +118,7 @@ class _AquaAppState extends State<AquaApp> {
   Timer? _recycleTimer;
   List<String> _storageRoots = <String>['/storage/emulated/0'];
   static const FlutterSecureStorage _folderPinStore = FlutterSecureStorage();
+  final AudioPlayer _mediaAudioPlayer = AudioPlayer();
 
   Color get _accent => aquaAccents[_theme];
 
@@ -655,6 +657,7 @@ class _AquaAppState extends State<AquaApp> {
   @override
   void dispose() {
     _recycleTimer?.cancel();
+    _mediaAudioPlayer.dispose();
     super.dispose();
   }
 
@@ -740,22 +743,124 @@ class _AquaAppState extends State<AquaApp> {
       return;
     }
     final ext = _extensionOf(entity);
-    final media = <String>{'mp3','wav','m4a','aac','flac','ogg','opus','wma','mp4','mkv','mov','webm','3gp','avi','m4v'};
+    const audio = <String>{'mp3','wav','m4a','aac','flac','ogg','opus','wma'};
+    const video = <String>{'mp4','mkv','mov','webm','3gp','avi','m4v'};
+    if (audio.contains(ext)) {
+      await _playAudioFile(entity);
+      return;
+    }
+    if (video.contains(ext)) {
+      await _playVideoFile(entity);
+      return;
+    }
     try {
       final result = await OpenFilex.open(entity.path);
       if (result.type != ResultType.done) {
         _message(result.message.isNotEmpty
             ? result.message
-            : 'No installed app can open this file type.');
+            : 'No compatible document viewer is installed for this file.');
         await _showDetails(entity);
       }
     } catch (e) {
       _message('Could not open file: $e');
       await _showDetails(entity);
     }
-    if (media.contains(ext)) {
-      // Audio/video are handed to the Android media app selected by the user.
-      // Document formats are likewise opened by a compatible installed viewer.
+  }
+
+  Future<void> _playAudioFile(File file) async {
+    try {
+      await _mediaAudioPlayer.stop();
+      await _mediaAudioPlayer.setSourceDeviceFile(file.path);
+      await _mediaAudioPlayer.resume();
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: const Color(0xFF102B38),
+        builder: (sheetContext) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(22),
+            child: StreamBuilder<PlayerState>(
+              stream: _mediaAudioPlayer.onPlayerStateChanged,
+              initialData: PlayerState.playing,
+              builder: (context, snapshot) {
+                final playing = snapshot.data == PlayerState.playing;
+                return Column(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.graphic_eq_rounded, color: _accent, size: 44),
+                  const SizedBox(height: 10),
+                  Text(_nameOf(file), maxLines: 2, textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 14),
+                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                    IconButton(
+                      iconSize: 38,
+                      onPressed: () async {
+                        if (playing) {
+                          await _mediaAudioPlayer.pause();
+                        } else {
+                          await _mediaAudioPlayer.resume();
+                        }
+                      },
+                      icon: Icon(playing ? Icons.pause_circle : Icons.play_circle,
+                        color: _accent),
+                    ),
+                    IconButton(
+                      iconSize: 30,
+                      onPressed: () async {
+                        await _mediaAudioPlayer.stop();
+                        if (sheetContext.mounted) Navigator.pop(sheetContext);
+                      },
+                      icon: const Icon(Icons.stop_circle_outlined),
+                    ),
+                  ]),
+                ]);
+              },
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      _message('Audio playback failed: $e');
+    }
+  }
+
+  Future<void> _playVideoFile(File file) async {
+    final controller = VideoPlayerController.file(file);
+    try {
+      await controller.initialize();
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+      await controller.play();
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: const Color(0xFF102B38),
+          title: Text(_nameOf(file), maxLines: 1, overflow: TextOverflow.ellipsis),
+          content: AspectRatio(
+            aspectRatio: controller.value.aspectRatio > 0
+                ? controller.value.aspectRatio : 16 / 9,
+            child: VideoPlayer(controller),
+          ),
+          actions: [
+            ValueListenableBuilder<VideoPlayerValue>(
+              valueListenable: controller,
+              builder: (context, value, _) => TextButton.icon(
+                onPressed: () => value.isPlaying ? controller.pause() : controller.play(),
+                icon: Icon(value.isPlaying ? Icons.pause : Icons.play_arrow),
+                label: Text(value.isPlaying ? 'Pause' : 'Play'),
+              ),
+            ),
+            TextButton(onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Close')),
+          ],
+        ),
+      );
+    } catch (e) {
+      _message('Video playback failed: $e');
+    } finally {
+      await controller.dispose();
     }
   }
 
