@@ -473,7 +473,7 @@ class _AquaAppState extends State<AquaApp> {
   Widget _glass({required Widget child}) => ClipRRect(
     borderRadius: BorderRadius.circular(23),
     child: BackdropFilter(
-      filter: ui.ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+      filter: ui.ImageFilter.blur(sigmaX: 26, sigmaY: 26),
       child: Container(
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
@@ -581,6 +581,7 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
   StreamSubscription<AccelerometerEvent>? _sensor;
   Size _size = Size.zero;
   Offset _gravity = Offset.zero;
+  Offset? _gravityBaseline;
   Offset? _finger;
   double _lastTick = 0;
 
@@ -590,9 +591,12 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
     _ticker = AnimationController(vsync: this, duration: const Duration(days: 1))
       ..addListener(_advance)..repeat();
     _sensor = accelerometerEventStream().listen((event) {
+      // Calibrate the resting phone orientation so bubbles stay buoyant
+      // when the phone is still and react only to changes in tilt.
+      _gravityBaseline ??= Offset(event.x, event.y);
       _gravity = Offset(
-        (event.x / 9.8).clamp(-1.0, 1.0).toDouble(),
-        (-event.y / 9.8).clamp(-1.0, 1.0).toDouble(),
+        ((event.x - _gravityBaseline!.dx) / 9.8).clamp(-1.0, 1.0).toDouble(),
+        ((event.y - _gravityBaseline!.dy) / 9.8).clamp(-1.0, 1.0).toDouble(),
       );
     }, onError: (_) {});
   }
@@ -616,14 +620,18 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
       _bubbles.add(_createBubble(y: _random.nextDouble() * _size.height));
     }
 
-    for (final b in _bubbles) {
+    for (var index = 0; index < _bubbles.length; index++) {
+      final b = _bubbles[index];
       b.phase += .018 * dt;
       if (widget.gravityEnabled) {
-        b.vx += _gravity.dx * .075 * dt;
-        b.vy += _gravity.dy * .075 * dt - .012 * dt;
+        // Tilt adds a calibrated gravity vector while buoyancy keeps a
+        // gentle upward drift when the phone is held still.
+        b.vx += _gravity.dx * .11 * dt;
+        b.vy += _gravity.dy * .11 * dt - (.025 + b.r / 6500) * dt;
       } else {
-        b.vx += math.sin(b.phase) * .018 * dt + (_random.nextDouble() - .5) * .012 * dt;
-        b.vy -= (.008 + b.r / 5000) * dt;
+        // Organic idle motion: buoyancy, lateral sway and fluid drift.
+        b.vx += math.sin(b.phase) * .045 * dt + (_random.nextDouble() - .5) * .022 * dt;
+        b.vy += math.cos(b.phase * .73) * .018 * dt - (.018 + b.r / 6500) * dt;
       }
       if (_finger != null) {
         final dx = _finger!.dx - b.x;
@@ -643,7 +651,11 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
       if (b.x < b.r) { b.x = b.r; b.vx = b.vx.abs() * .86; }
       if (b.x > _size.width - b.r) { b.x = _size.width - b.r; b.vx = -b.vx.abs() * .86; }
       if (b.y < b.r) { b.y = b.r; b.vy = b.vy.abs() * .82; }
-      if (b.y > _size.height - b.r) { b.y = _size.height - b.r; b.vy = -b.vy.abs() * .82; }
+      // Recycle bubbles only after they have completely left the viewport.
+      if (b.y - b.r > _size.height) {
+        _bubbles[index] = _createBubble(y: _size.height + b.r);
+        continue;
+      }
     }
 
     if (!widget.reduced) {
