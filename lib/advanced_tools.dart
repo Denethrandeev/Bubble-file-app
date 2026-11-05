@@ -208,7 +208,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
         mac: Mac(base64Decode(envelope['mac'] as String)),
       );
       final clear = await AesGcm.with256bits().decrypt(box, secretKey: SecretKey(await _getVaultKey()));
-      final name = (envelope['name'] as String).replaceAll(RegExp(r'[/\\\\]'), '_');
+      final name = (envelope['name'] as String).replaceAll(RegExp(r'[/\\]'), '_');
       await File('$destination/$name').writeAsBytes(clear, flush: true);
       _say('Decrypted file exported to the selected folder.');
     } catch (e) {
@@ -252,7 +252,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
       final archive = ZipDecoder().decodeBytes(await File(path).readAsBytes());
       final root = Directory(destination).absolute.path;
       for (final item in archive) {
-        final normalized = item.name.replaceAll('\\\\', '/');
+        final normalized = item.name.replaceAll('\\', '/');
         if (normalized.startsWith('/') || normalized.split('/').contains('..')) continue;
         final output = File('$root/$normalized').absolute;
         if (!output.path.startsWith('$root${Platform.pathSeparator}') && output.path != root) continue;
@@ -318,7 +318,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
   }
 
   double? _dmsToDecimal(String raw, String ref) {
-    final values = RegExp(r'-?\\d+(?:\\.\\d+)?').allMatches(raw)
+    final values = RegExp(r'-?\d+(?:\.\d+)?').allMatches(raw)
       .map((m) => double.tryParse(m.group(0)!)).whereType<double>().toList();
     if (values.isEmpty) return null;
     final degrees = values[0];
