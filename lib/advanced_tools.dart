@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
@@ -79,7 +80,8 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
         _say('PIN must be at least 6 digits and both entries must match.');
         return false;
       }
-      final newSalt = base64Encode(Cryptography.instance.randomBytes(16));
+      final secureRandom = math.Random.secure();
+      final newSalt = base64Encode(List<int>.generate(16, (_) => secureRandom.nextInt(256)));
       final digest = hashes.sha256.convert(utf8.encode('$newSalt:$pin')).toString();
       final key = await AesGcm.with256bits().newSecretKey();
       final keyBytes = await key.extractBytes();
@@ -172,6 +174,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
     setState(() => _busy = true);
     try {
       final source = File(path);
+      if (await source.length() > 100 * 1024 * 1024) throw StateError('For low-memory safety, Vault import is limited to 100 MB per file.');
       final bytes = await source.readAsBytes();
       final key = SecretKey(await _getVaultKey());
       final box = await AesGcm.with256bits().encrypt(bytes, secretKey: key);
@@ -223,6 +226,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
         final path = item.path;
         if (path == null) continue;
         final file = File(path);
+        if (await file.length() > 100 * 1024 * 1024) continue;
         final bytes = await file.readAsBytes();
         archive.addFile(ArchiveFile(item.name, bytes.length, bytes));
       }
@@ -230,7 +234,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
       if (encoded == null) throw StateError('ZIP encoding failed.');
       final output = File('${widget.targetDirectory.path}/Aqua_${DateTime.now().millisecondsSinceEpoch}.zip');
       await output.writeAsBytes(encoded, flush: true);
-      _say('ZIP created in the current Aqua folder.');
+      _say('ZIP created in the current Aqua folder. Files over 100 MB were skipped for low-memory safety.');
     } catch (e) {
       _say('ZIP creation failed: $e');
     } finally {
