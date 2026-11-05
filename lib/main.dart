@@ -95,6 +95,7 @@ class _AquaAppState extends State<AquaApp> {
   bool _gravity = true;
   bool _animations = true;
   bool _performance = true;
+  double _bubbleSpeed = 1.0;
   bool _light = false;
   bool _checkingPermission = false;
   bool _hasStorage = false;
@@ -898,6 +899,7 @@ class _AquaAppState extends State<AquaApp> {
               accent: _accent,
               gravityEnabled: _gravity,
               reduced: _performance,
+              speed: _bubbleSpeed,
             )),
           SafeArea(child: Column(children: [
             _header(foreground),
@@ -1222,6 +1224,27 @@ class _AquaAppState extends State<AquaApp> {
         (v) => setState(() => _animations = v)),
       _switchTile('Performance mode', 'Use fewer bubbles and less motion work', _performance,
         (v) => setState(() => _performance = v)),
+      const SizedBox(height: 10),
+      _glass(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Expanded(child: Text('BUBBLE MOVEMENT SPEED',
+            style: TextStyle(fontSize: 10, letterSpacing: 1.5, color: Colors.white60))),
+          Text('${_bubbleSpeed.toStringAsFixed(1)}×',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _accent)),
+        ]),
+        Slider(
+          value: _bubbleSpeed,
+          min: .3,
+          max: 2.2,
+          divisions: 19,
+          activeColor: _accent,
+          onChanged: (value) => setState(() => _bubbleSpeed = value),
+        ),
+        const Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          Text('Slow', style: TextStyle(fontSize: 10, color: Colors.white54)),
+          Text('Fast', style: TextStyle(fontSize: 10, color: Colors.white54)),
+        ]),
+      ])),
       _switchTile('Light appearance', 'Switch the interface brightness', _light,
         (v) => setState(() => _light = v)),
       const SizedBox(height: 12),
@@ -1522,9 +1545,7 @@ class _Glow extends StatelessWidget {
 class _Bubble {
   _Bubble(this.r, this.x, this.y, this.vx, this.vy, this.phase, this.opacity, this.hue);
   double r, x, y, vx, vy, phase, opacity, hue;
-  bool fading = false;
-  double fade = 0;
-}
+ }
 
 class _Ripple {
   _Ripple(this.x, this.y, this.radius);
@@ -1541,10 +1562,11 @@ class _WaterDroplet {
 }
 
 class BubbleField extends StatefulWidget {
-  const BubbleField({super.key, required this.accent, required this.gravityEnabled, required this.reduced});
+  const BubbleField({super.key, required this.accent, required this.gravityEnabled, required this.reduced, required this.speed});
   final Color accent;
   final bool gravityEnabled;
   final bool reduced;
+  final double speed;
   @override
   State<BubbleField> createState() => _BubbleFieldState();
 }
@@ -1606,22 +1628,17 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
     for (var index = 0; index < _bubbles.length; index++) {
       final b = _bubbles[index];
       b.phase += .018 * dt;
-      if (b.fading) {
-        b.fade = (b.fade + .018 * dt).clamp(0.0, 1.0).toDouble();
-        b.vx *= math.pow(.96, dt).toDouble();
-        b.vy *= math.pow(.96, dt).toDouble();
-      }
-      if (widget.gravityEnabled && !b.fading) {
+      if (widget.gravityEnabled) {
         // Tilt adds a calibrated gravity vector while buoyancy keeps a
         // gentle upward drift when the phone is held still.
         b.vx += _gravity.dx * .11 * dt;
         b.vy += _gravity.dy * .11 * dt - (.025 + b.r / 6500) * dt;
-      } else if (!b.fading) {
+      } else {
         // Organic idle motion: buoyancy, lateral sway and fluid drift.
         b.vx += math.sin(b.phase) * .045 * dt + (_random.nextDouble() - .5) * .022 * dt;
         b.vy += math.cos(b.phase * .73) * .018 * dt - (.018 + b.r / 6500) * dt;
       }
-      if (_finger != null && !b.fading) {
+      if (_finger != null) {
         final dx = _finger!.dx - b.x;
         final dy = _finger!.dy - b.y;
         final distance = math.sqrt(dx * dx + dy * dy);
@@ -1633,8 +1650,8 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
       }
       b.vx *= math.pow(.992, dt).toDouble();
       b.vy *= math.pow(.994, dt).toDouble();
-      b.x += b.vx * dt * 2.2;
-      b.y += b.vy * dt * 2.2;
+      b.x += b.vx * dt * 2.2 * widget.speed;
+      b.y += b.vy * dt * 2.2 * widget.speed;
 
       if (b.x < b.r) { b.x = b.r; b.vx = b.vx.abs() * .86; }
       if (b.x > _size.width - b.r) { b.x = _size.width - b.r; b.vx = -b.vx.abs() * .86; }
@@ -1647,9 +1664,7 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
       }
     }
 
-    _bubbles.removeWhere((bubble) => bubble.fade >= 1);
-
-    if (!widget.reduced) {
+     if (!widget.reduced) {
       for (var i = 0; i < _bubbles.length; i++) {
         for (var j = i + 1; j < _bubbles.length; j++) {
           final a = _bubbles[i], b = _bubbles[j];
@@ -1672,30 +1687,29 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
       }
     }
 
-    // Expand each ripple as a real wavefront. Only bubbles crossed by the
-    // ring receive a gentle outward impulse and then shrink/fade away.
+    // The ripple grows outward, then contracts smoothly and disappears.
+    // Bubbles are never resized or faded: only bubbles touched by the
+    // moving wave line receive a small, damped movement impulse.
     for (final ripple in _ripples) {
-      final ringRadius = (1 - ripple.life) * ripple.radius;
-      if (ringRadius > ripple.previousRadius) {
-        for (final bubble in _bubbles) {
-          if (bubble.fading || ripple.affected.contains(bubble)) continue;
-          final distance = (Offset(bubble.x, bubble.y) -
-              Offset(ripple.x, ripple.y)).distance;
-          final innerEdge = math.max(0.0, ripple.previousRadius - bubble.r);
-          final outerEdge = ringRadius + bubble.r;
-          if (distance >= innerEdge && distance <= outerEdge) {
-            ripple.affected.add(bubble);
-            bubble.fading = true;
-            final dx = bubble.x - ripple.x;
-            final dy = bubble.y - ripple.y;
-            final length = math.max(1.0, math.sqrt(dx * dx + dy * dy));
-            bubble.vx += dx / length * .42;
-            bubble.vy += dy / length * .42;
-          }
+      final progress = 1 - ripple.life;
+      final ringRadius = ripple.radius * math.sin(math.pi * progress);
+      final low = math.min(ripple.previousRadius, ringRadius);
+      final high = math.max(ripple.previousRadius, ringRadius);
+      for (final bubble in _bubbles) {
+        if (ripple.affected.contains(bubble)) continue;
+        final distance = (Offset(bubble.x, bubble.y) -
+            Offset(ripple.x, ripple.y)).distance;
+        if (distance + bubble.r >= low && distance - bubble.r <= high) {
+          ripple.affected.add(bubble);
+          final dx = bubble.x - ripple.x;
+          final dy = bubble.y - ripple.y;
+          final length = math.max(1.0, math.sqrt(dx * dx + dy * dy));
+          bubble.vx += dx / length * .16;
+          bubble.vy += dy / length * .16;
         }
       }
       ripple.previousRadius = ringRadius;
-      ripple.life -= .0125 * dt;
+      ripple.life -= .009 * dt;
     }
     _ripples.removeWhere((r) => r.life <= 0);
 
@@ -1834,7 +1848,7 @@ class _BubblePainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     for (final ripple in ripples) {
       final progress = 1 - ripple.life;
-      final radius = ripple.radius * progress;
+      final radius = ripple.radius * math.sin(math.pi * progress);
       final paint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = (2.2 * ripple.life).clamp(.45, 2.2)
@@ -1855,8 +1869,8 @@ class _BubblePainter extends CustomPainter {
           ..color = Colors.white.withOpacity(.55 * drop.life));
     }
     for (final b in bubbles) {
-      final bubbleRadius = b.r * (1 - b.fade * .92);
-      final bubbleOpacity = b.opacity * (1 - b.fade);
+      final bubbleRadius = b.r;
+      final bubbleOpacity = b.opacity;
       final color = HSLColor.fromAHSL(1, b.hue % 360, .78, .60).toColor();
       final rect = Rect.fromCircle(center: Offset(b.x, b.y), radius: bubbleRadius);
       final paint = Paint()
