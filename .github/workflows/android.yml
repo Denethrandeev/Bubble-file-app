@@ -118,6 +118,31 @@ jobs:
                                       val stats = StatFs(Environment.getExternalStorageDirectory().absolutePath)
                                       result.success(mapOf("total" to stats.totalBytes, "free" to stats.availableBytes))
                                   }}
+                                  "storageVolumes" -> {{
+                                      val storageVolumes = getExternalFilesDirs(null).filterNotNull().mapNotNull {{ directory ->
+                                          val rawPath = directory.absolutePath
+                                          val marker = "/Android/data/"
+                                          val root = if (rawPath.contains(marker)) rawPath.substringBefore(marker) else rawPath
+                                          val state = Environment.getExternalStorageState(directory)
+                                          if (state != Environment.MEDIA_MOUNTED && state != Environment.MEDIA_MOUNTED_READ_ONLY) {{
+                                              null
+                                          }} else {{
+                                              try {{
+                                                  val stats = StatFs(root)
+                                                  mapOf(
+                                                      "path" to root,
+                                                      "removable" to Environment.isExternalStorageRemovable(directory),
+                                                      "state" to state,
+                                                      "total" to stats.totalBytes,
+                                                      "free" to stats.availableBytes
+                                                  )
+                                              }} catch (_: Exception) {{
+                                                  null
+                                              }}
+                                          }}
+                                      }}.distinctBy {{ it["path"] }}
+                                      result.success(storageVolumes)
+                                  }}
                                   "deviceDiagnostics" -> {{
                                       val manager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
                                       val memory = ActivityManager.MemoryInfo()
