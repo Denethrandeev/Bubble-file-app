@@ -79,29 +79,41 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          roots = [Path.home() / ".pub-cache/hosted/pub.dev", Path.home() / ".pub-cache/hosted"]
-          changed = []
+          roots = [
+              Path.home() / ".pub-cache" / "hosted",
+              Path("/opt/hostedtoolcache/flutter"),
+          ]
+          candidates = []
           for root in roots:
-              if not root.exists():
-                  continue
-              for gradle in root.glob("file_picker-*/android/build.gradle"):
-                  lines = gradle.read_text().splitlines()
-                  count = 0
-                  for i, line in enumerate(lines):
-                      stripped = line.strip()
+              if root.exists():
+                  for path in root.rglob("build.gradle*"):
+                      if path.parent.name == "android" and path.parent.parent.name.startswith("file_picker-"):
+                          candidates.append(path)
+          if not candidates:
+              raise SystemExit("file_picker Android Gradle file not found; searched pub cache and Flutter tool cache")
+          changed = []
+          for gradle in candidates:
+              text = gradle.read_text()
+              lines = text.splitlines()
+              count = 0
+              for i, line in enumerate(lines):
+                  stripped = line.strip()
+                  if stripped.startswith(("compileSdkVersion ", "compileSdkVersion=", "compileSdk ", "compileSdk=")):
                       indent = line[:len(line) - len(line.lstrip())]
-                      if stripped.startswith("compileSdkVersion "):
-                          lines[i] = indent + "compileSdkVersion 36"
-                          count += 1
-                      elif stripped.startswith("compileSdk ="):
+                      if gradle.name.endswith(".kts"):
                           lines[i] = indent + "compileSdk = 36"
-                          count += 1
-                  if count:
-                      gradle.write_text("\n".join(lines) + "\n")
-                      changed.append(str(gradle))
+                      else:
+                          lines[i] = indent + "compileSdkVersion 36"
+                      count += 1
+              if count:
+                  gradle.write_text("\\n".join(lines) + "\\n")
+                  changed.append(f"{gradle} ({count} setting(s))")
           if not changed:
-              raise SystemExit("Could not locate file_picker Android Gradle file to align compile SDK")
-          print("Updated plugin compile SDK to 36:", changed)
+              for path in candidates:
+                  print("Found but no recognized compileSdk declaration:", path)
+                  print(path.read_text())
+              raise SystemExit("No compileSdk declaration could be patched in file_picker")
+          print("Aligned file_picker Android compile SDK:", changed)
           PY
       - name: Analyze
         run: flutter analyze --no-fatal-infos
