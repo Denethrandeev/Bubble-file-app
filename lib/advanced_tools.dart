@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
@@ -357,7 +356,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
           }
         } catch (_) {}
       }
-      candidates.sort((a, b) => b.statSync().size.compareTo(a.statSync().size));
+      candidates.sort((a, b) {\n        try { return b.statSync().size.compareTo(a.statSync().size); } catch (_) { return 0; }\n      });
       if (mounted) setState(() => _cleanupSuggestions = candidates);
       _say('Smart Cleanup found ${candidates.length} large or older files. Nothing was deleted.');
     } finally {
