@@ -9,6 +9,8 @@ import 'package:crypto/crypto.dart' as hashes;
 import 'package:exif/exif.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:path_provider/path_provider.dart';
@@ -339,8 +341,46 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
   }
 
   Future<void> _openMap(_GeoPhoto photo) async {
-    final uri = Uri.parse('https://www.openstreetmap.org/?mlat=${photo.latitude}&mlon=${photo.longitude}#map=16/${photo.latitude}/${photo.longitude}');
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) _say('Could not open the map application.');
+    final locations = _geoPhotos.isEmpty ? <_GeoPhoto>[photo] : _geoPhotos;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF102B38),
+      builder: (context) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.of(context).size.height * .72,
+          child: Column(children: [
+            const Padding(
+              padding: EdgeInsets.all(14),
+              child: Text('Photo locations', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
+            Expanded(child: FlutterMap(
+              options: MapOptions(
+                initialCenter: LatLng(photo.latitude, photo.longitude),
+                initialZoom: 12,
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.aqua.filemanager',
+                ),
+                MarkerLayer(markers: locations.map((item) => Marker(
+                  point: LatLng(item.latitude, item.longitude),
+                  width: 42,
+                  height: 42,
+                  child: const Icon(Icons.location_on, color: Colors.redAccent, size: 38),
+                )).toList()),
+              ],
+            )),
+            const Padding(
+              padding: EdgeInsets.all(8),
+              child: Text('Map data © OpenStreetMap contributors',
+                style: TextStyle(fontSize: 10, color: Colors.white60)),
+            ),
+          ]),
+        ),
+      ),
+    );
   }
 
   Future<void> _smartCleanup() async {
