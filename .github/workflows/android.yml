@@ -97,7 +97,7 @@ jobs:
                           lines[i] = indent + "compileSdk = 36"
                           count += 1
                   if count:
-                      gradle.write_text("\\n".join(lines) + "\\n")
+                      gradle.write_text("\n".join(lines) + "\n")
                       changed.append(str(gradle))
           if not changed:
               raise SystemExit("Could not locate file_picker Android Gradle file to align compile SDK")
