@@ -40,6 +40,8 @@ class _AquaAppState extends State<AquaApp> {
   List<FileSystemEntity> _items = <FileSystemEntity>[];
   String _search = '';
   bool _foldersFirst = true;
+  String _fileCategory = 'All files';
+  String _sortMode = 'Name';
 
   Color get _accent => aquaAccents[_theme];
 
@@ -109,9 +111,60 @@ class _AquaAppState extends State<AquaApp> {
   String _nameOf(FileSystemEntity entity) =>
       entity.path.split(Platform.pathSeparator).where((s) => s.isNotEmpty).last;
 
-  List<FileSystemEntity> get _visibleItems => _items.where((item) {
-    return _nameOf(item).toLowerCase().contains(_search.toLowerCase());
-  }).toList();
+  String _extensionOf(FileSystemEntity entity) {
+    final name = _nameOf(entity);
+    final dot = name.lastIndexOf('.');
+    return dot < 0 ? '' : name.substring(dot + 1).toLowerCase();
+  }
+
+  bool _matchesCategory(FileSystemEntity item) {
+    if (item is Directory || _fileCategory == 'All files') return true;
+    final ext = _extensionOf(item);
+    switch (_fileCategory) {
+      case 'Images':
+        return <String>{'jpg','jpeg','png','gif','webp','bmp','heic','heif','tif','tiff'}.contains(ext);
+      case 'Videos':
+        return <String>{'mp4','mkv','mov','webm','3gp','avi','m4v'}.contains(ext);
+      case 'Audio':
+        return <String>{'mp3','wav','m4a','aac','flac','ogg','opus','wma'}.contains(ext);
+      case 'Documents':
+        return <String>{'pdf','doc','docx','txt','rtf','xls','xlsx','ppt','pptx','csv'}.contains(ext);
+      case 'APKs':
+        return ext == 'apk';
+      case 'Downloads':
+        return item.path.toLowerCase().contains('/download');
+      default:
+        return true;
+    }
+  }
+
+  List<FileSystemEntity> get _visibleItems {
+    final items = _items.where((item) =>
+      _nameOf(item).toLowerCase().contains(_search.toLowerCase()) &&
+      _matchesCategory(item)).toList();
+    items.sort((a, b) {
+      if (_foldersFirst && a is Directory != (b is Directory)) {
+        return a is Directory ? -1 : 1;
+      }
+      switch (_sortMode) {
+        case 'Size':
+          int sizeOf(FileSystemEntity item) {
+            try { return item is File ? item.lengthSync() : 0; } catch (_) { return 0; }
+          }
+          return sizeOf(b).compareTo(sizeOf(a));
+        case 'Date':
+          DateTime dateOf(FileSystemEntity item) {
+            try { return item.statSync().modified; } catch (_) { return DateTime.fromMillisecondsSinceEpoch(0); }
+          }
+          return dateOf(b).compareTo(dateOf(a));
+        case 'Type':
+          return _extensionOf(a).compareTo(_extensionOf(b));
+        default:
+          return _nameOf(a).toLowerCase().compareTo(_nameOf(b).toLowerCase());
+      }
+    });
+    return items;
+  }
 
   Future<void> _createFolder() async {
     final controller = TextEditingController();
@@ -319,7 +372,11 @@ class _AquaAppState extends State<AquaApp> {
 
   Widget _category(String title, IconData icon) => InkWell(
     borderRadius: BorderRadius.circular(20),
-    onTap: () => setState(() => _tab = 1),
+    onTap: () => setState(() {
+      _fileCategory = title;
+      _search = '';
+      _tab = 1;
+    }),
     child: _glass(child: Row(children: [
       Icon(icon, color: _accent, size: 25),
       const SizedBox(width: 10),
@@ -333,7 +390,7 @@ class _AquaAppState extends State<AquaApp> {
       Padding(
         padding: const EdgeInsets.fromLTRB(19, 8, 19, 10),
         child: Row(children: [
-          Expanded(child: Text('My Files', style: TextStyle(fontSize: 27,
+          Expanded(child: Text(_fileCategory, style: TextStyle(fontSize: 27,
             fontWeight: FontWeight.w800, color: foreground))),
           IconButton(onPressed: _createFolder, icon: Icon(Icons.create_new_folder_rounded, color: _accent)),
           IconButton(onPressed: () => _loadDirectory(_root), icon: Icon(Icons.home_rounded, color: _accent)),
@@ -370,9 +427,29 @@ class _AquaAppState extends State<AquaApp> {
               }, icon: const Icon(Icons.arrow_back_rounded, size: 19)),
               Expanded(child: Text(_current.path, maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 10, color: Colors.white60))),
-              TextButton(onPressed: () => setState(() => _foldersFirst = !_foldersFirst),
-                child: Text(_foldersFirst ? 'Folders first' : 'Name sort',
-                  style: TextStyle(fontSize: 10, color: _accent))),
+              PopupMenuButton<String>(
+                tooltip: 'Sort files',
+                onSelected: (value) => setState(() {
+                  if (value == 'Folders first' || value == 'No folder priority') {
+                    _foldersFirst = value == 'Folders first';
+                  } else {
+                    _sortMode = value;
+                  }
+                }),
+                itemBuilder: (context) => const [
+                  PopupMenuItem(value: 'Name', child: Text('Sort by name')),
+                  PopupMenuItem(value: 'Size', child: Text('Sort by size')),
+                  PopupMenuItem(value: 'Date', child: Text('Sort by date')),
+                  PopupMenuItem(value: 'Type', child: Text('Sort by type')),
+                  PopupMenuDivider(),
+                  PopupMenuItem(value: 'Folders first', child: Text('Folders first')),
+                  PopupMenuItem(value: 'No folder priority', child: Text('No folder priority')),
+                ],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Text('Sort: $_sortMode', style: TextStyle(fontSize: 10, color: _accent)),
+                ),
+              ),
             ]),
           ]),
         )),
