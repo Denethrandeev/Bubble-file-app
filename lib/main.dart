@@ -141,7 +141,7 @@ class AquaApp extends StatefulWidget {
   State<AquaApp> createState() => _AquaAppState();
 }
 
-class _AquaAppState extends State<AquaApp> {
+class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   int _tab = 0;
   int _theme = 0;
   bool _gravity = true;
@@ -185,6 +185,7 @@ class _AquaAppState extends State<AquaApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _waterSensor = accelerometerEventStream().listen((event) {
       _waterBaseline ??= Offset(event.x, event.y);
       final next = Offset(
@@ -1148,7 +1149,15 @@ class _AquaAppState extends State<AquaApp> {
 
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _hasStorage) {
+      _refreshStorageVolumes();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _waterSensor?.cancel();
     _recycleTimer?.cancel();
     _mediaAudioPlayer.dispose();
