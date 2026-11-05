@@ -346,15 +346,32 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
   Future<void> _smartCleanup() async {
     setState(() => _busy = true);
     final candidates = <File>[];
-    final pending = <Directory>[widget.targetDirectory];
+    final pending = <Directory>[];
+    final seenRoots = <String>{};
+    // Scan Android shared-storage mount points, including removable volumes
+    // when Android exposes them to this app. SAF-only providers are not paths.
+    for (final mount in <String>['/storage', '/mnt/media_rw']) {
+      final root = Directory(mount);
+      try {
+        if (await root.exists()) {
+          await for (final entry in root.list(followLinks: false)) {
+            if (entry is Directory && seenRoots.add(entry.path)) pending.add(entry);
+          }
+        }
+      } catch (_) {}
+    }
+    if (seenRoots.add(widget.targetDirectory.path)) pending.add(widget.targetDirectory);
     var visited = 0;
     try {
-      while (pending.isNotEmpty && visited < 5000) {
+      while (pending.isNotEmpty && visited < 30000) {
         final dir = pending.removeLast();
         try {
           await for (final entity in dir.list(followLinks: false)) {
             if (entity is Directory) {
-              if (!entity.path.contains('/Android/data/')) pending.add(entity);
+              if (!entity.path.contains('/Android/data/') &&
+                  !entity.path.contains('/Android/obb/') &&
+                  !entity.path.contains('/aqua_recycle_bin/') &&
+                  !entity.path.contains('/aqua_encrypted_vault/')) pending.add(entity);
             } else if (entity is File) {
               visited++;
               try {
@@ -365,7 +382,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
                 }
               } catch (_) {}
             }
-            if (visited >= 5000) break;
+            if (visited >= 30000) break;
           }
         } catch (_) {}
       }
@@ -373,7 +390,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
         try { return b.statSync().size.compareTo(a.statSync().size); } catch (_) { return 0; }
       });
       if (mounted) setState(() => _cleanupSuggestions = candidates);
-      _say('Smart Cleanup found ${candidates.length} large or older files. Nothing was deleted.');
+      _say('Smart Cleanup scanned up to ${visited} files across accessible internal/removable storage mounts and found ${candidates.length} large or older files. Nothing was deleted.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
