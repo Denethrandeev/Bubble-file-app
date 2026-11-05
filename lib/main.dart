@@ -398,21 +398,48 @@ class _AquaAppState extends State<AquaApp> {
       _message('Recycle Bin is not ready yet.');
       return;
     }
+    final id = DateTime.now().microsecondsSinceEpoch.toString();
+    final storedPath = '${folder.path}/${id}_${_nameOf(entity)}';
+    final record = <String, dynamic>{
+      'id': id,
+      'name': _nameOf(entity),
+      'originalPath': entity.path,
+      'storedPath': storedPath,
+      'stage': 'bin',
+      'stageStartedAt': DateTime.now().millisecondsSinceEpoch,
+    };
     try {
-      final id = DateTime.now().microsecondsSinceEpoch.toString();
-      final storedPath = '${folder.path}/${id}_${_nameOf(entity)}';
+      // Complete and persist the recovery copy before removing the original.
       await _copyEntityRecursively(entity, storedPath);
-      await _deleteEntityPermanently(entity.path);
-      final now = DateTime.now().millisecondsSinceEpoch;
-      setState(() => _recycleRecords.add({
-        'id': id, 'name': _nameOf(entity), 'originalPath': entity.path,
-        'storedPath': storedPath, 'stage': 'bin', 'stageStartedAt': now,
-      }));
-      await _saveRecycleRecords();
-      await _loadDirectory(_current);
-      _message('Moved to Recycle Bin for 30 days.');
+      if (await FileSystemEntity.type(storedPath, followLinks: false) ==
+          FileSystemEntityType.notFound) {
+        throw FileSystemException('Recycle copy was not created', storedPath);
+      }
+      _recycleRecords.add(record);
+      try {
+        await _saveRecycleRecords();
+      } catch (_) {
+        _recycleRecords.removeWhere((item) => item['id'] == id);
+        rethrow;
+      }
+
+      try {
+        await _deleteEntityPermanently(entity.path);
+        await _loadDirectory(_current);
+        _message('Moved to Recycle Bin for 30 days.');
+      } catch (deleteError) {
+        // The recovery copy is retained and can still be restored.
+        await _loadDirectory(_current);
+        _message('A recovery copy was saved in Recycle Bin, but the original could not be fully removed: $deleteError');
+      }
     } catch (e) {
-      _message('Could not move item to Recycle Bin: ' + e.toString());
+      final recorded = _recycleRecords.any((item) => item['id'] == id);
+      if (!recorded) {
+        try {
+          await _deleteEntityPermanently(storedPath);
+        } catch (_) {}
+      }
+      _message('Could not safely move item to Recycle Bin: $e');
     }
   }
 
