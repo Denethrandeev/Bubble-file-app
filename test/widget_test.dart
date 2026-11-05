@@ -1,11 +1,18 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:aqua_file_manager/main.dart';
+import 'package:bubble_file_manager/main.dart';
 
 void main() {
-  testWidgets('Aqua File Manager opens its home screen', (tester) async {
+  testWidgets('Bubble File Manager shows splash then opens home', (tester) async {
     await tester.pumpWidget(const AquaApp());
-    expect(find.text('AQUA'), findsOneWidget);
+
+    expect(find.text('BUBBLE'), findsOneWidget);
     expect(find.text('FILE MANAGER'), findsOneWidget);
+    expect(find.text('Safety and Relax File Management System'), findsOneWidget);
+    expect(find.text('Created by H.G.Aluthge'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 3300));
+    await tester.pump();
+
     expect(find.text('Your space,'), findsOneWidget);
   });
 }
