@@ -84,7 +84,8 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
   Future<bool> _verifyPin({bool setup = false}) async {
     final pinController = TextEditingController();
     final confirmController = TextEditingController();
-    final animalController = TextEditingController();
+    final recoveryQuestionController = TextEditingController();
+    final recoveryAnswerController = TextEditingController();
     final storedHash = await _secure.read(key: 'aqua_vault_pin_hash');
     final salt = await _secure.read(key: 'aqua_vault_pin_salt');
     if (storedHash == null && !setup) {
@@ -101,8 +102,10 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
           if (storedHash == null) ...[
             TextField(controller: confirmController, obscureText: true, keyboardType: TextInputType.number,
               decoration: const InputDecoration(labelText: 'Confirm PIN')),
-            TextField(controller: animalController, textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(labelText: 'Favourite animal name (recovery answer)')),
+            TextField(controller: recoveryQuestionController,
+              decoration: const InputDecoration(labelText: 'Your recovery question')),
+            TextField(controller: recoveryAnswerController, obscureText: true,
+              decoration: const InputDecoration(labelText: 'Your answer')),
           ],
         ])),
         actions: [
@@ -119,24 +122,28 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
       final recovered = await _recoverPin();
       pinController.dispose();
       confirmController.dispose();
-      animalController.dispose();
+      recoveryQuestionController.dispose();
+      recoveryAnswerController.dispose();
       return recovered;
     }
     if (result != 'pin') {
       pinController.dispose();
       confirmController.dispose();
-      animalController.dispose();
+      recoveryQuestionController.dispose();
+      recoveryAnswerController.dispose();
       return false;
     }
 
     final pin = pinController.text;
     if (storedHash == null) {
-      final answer = _normaliseRecoveryAnswer(animalController.text);
-      if (pin.length < 6 || pin != confirmController.text || answer.length < 2) {
-        _say('Use a PIN of at least 6 digits, confirm it, and enter a recovery answer.');
+      final question = recoveryQuestionController.text.trim();
+      final answer = _normaliseRecoveryAnswer(recoveryAnswerController.text);
+      if (pin.length < 6 || pin != confirmController.text || question.length < 5 || answer.length < 2) {
+        _say('Use a PIN of at least 6 digits, confirm it, and enter your own recovery question and answer.');
         pinController.dispose();
         confirmController.dispose();
-        animalController.dispose();
+        recoveryQuestionController.dispose();
+      recoveryAnswerController.dispose();
         return false;
       }
       final pinRecord = await _saltedDigest(pin);
@@ -145,19 +152,22 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
       final keyBytes = await key.extractBytes();
       await _secure.write(key: 'aqua_vault_pin_salt', value: pinRecord.split(':').first);
       await _secure.write(key: 'aqua_vault_pin_hash', value: pinRecord.split(':').last);
+      await _secure.write(key: 'aqua_vault_recovery_question', value: question);
       await _secure.write(key: 'aqua_vault_recovery_salt', value: answerRecord.split(':').first);
       await _secure.write(key: 'aqua_vault_recovery_hash', value: answerRecord.split(':').last);
       await _secure.write(key: 'aqua_vault_key', value: base64Encode(keyBytes));
       _say('Encrypted Vault created. Keep your PIN and recovery answer private.');
       pinController.dispose();
       confirmController.dispose();
-      animalController.dispose();
+      recoveryQuestionController.dispose();
+      recoveryAnswerController.dispose();
       return true;
     }
     final digest = hashes.sha256.convert(utf8.encode('$salt:$pin')).toString();
     pinController.dispose();
     confirmController.dispose();
-    animalController.dispose();
+    recoveryQuestionController.dispose();
+      recoveryAnswerController.dispose();
     if (digest != storedHash) {
       _say('Incorrect PIN.');
       return false;
@@ -167,7 +177,9 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
 
   Future<bool> _setRecoveryAnswerIfMissing() async {
     final existing = await _secure.read(key: 'aqua_vault_recovery_hash');
-    if (existing != null) return true;
+    final existingQuestion = await _secure.read(key: 'aqua_vault_recovery_question');
+    if (existing != null && existingQuestion != null) return true;
+    final questionController = TextEditingController();
     final answerController = TextEditingController();
     final result = await showDialog<bool>(
       context: context,
@@ -175,9 +187,11 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Set up PIN recovery'),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('Choose a private favourite-animal name as your recovery answer.'),
-          TextField(controller: answerController,
-            decoration: const InputDecoration(labelText: 'Favourite animal name')),
+          const Text('Create your own question and answer. Choose an answer that is private and difficult for others to guess.'),
+          TextField(controller: questionController,
+            decoration: const InputDecoration(labelText: 'Your recovery question')),
+          TextField(controller: answerController, obscureText: true,
+            decoration: const InputDecoration(labelText: 'Your answer')),
         ]),
         actions: [
           FilledButton(onPressed: () => Navigator.pop(dialogContext, true),
@@ -185,13 +199,16 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
         ],
       ),
     );
+    final question = questionController.text.trim();
     final answer = _normaliseRecoveryAnswer(answerController.text);
+    questionController.dispose();
     answerController.dispose();
-    if (result != true || answer.length < 2) {
-      _say('A recovery answer is required to finish Vault sign-in.');
+    if (result != true || question.length < 5 || answer.length < 2) {
+      _say('A recovery question and answer are required to finish Vault sign-in.');
       return false;
     }
     final record = await _saltedDigest(answer);
+    await _secure.write(key: 'aqua_vault_recovery_question', value: question);
     await _secure.write(key: 'aqua_vault_recovery_salt', value: record.split(':').first);
     await _secure.write(key: 'aqua_vault_recovery_hash', value: record.split(':').last);
     return true;
@@ -201,10 +218,11 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
     final answerController = TextEditingController();
     final newPinController = TextEditingController();
     final confirmController = TextEditingController();
+    final recoveryQuestion = await _secure.read(key: 'aqua_vault_recovery_question');
     final recoverySalt = await _secure.read(key: 'aqua_vault_recovery_salt');
     final recoveryHash = await _secure.read(key: 'aqua_vault_recovery_hash');
-    if (recoverySalt == null || recoveryHash == null) {
-      _say('Recovery is not configured on this Vault. Use device authentication if available.');
+    if (recoveryQuestion == null || recoverySalt == null || recoveryHash == null) {
+      _say('Recovery is not configured on this Vault. Unlock with your PIN and set a recovery question first.');
       answerController.dispose();
       newPinController.dispose();
       confirmController.dispose();
@@ -215,9 +233,9 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Recover Vault PIN'),
         content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('Enter the favourite animal name you saved when setting up the Vault.'),
-          TextField(controller: answerController, textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(labelText: 'Recovery answer')),
+          Text(recoveryQuestion),
+          TextField(controller: answerController, obscureText: true,
+            decoration: const InputDecoration(labelText: 'Your answer')),
           TextField(controller: newPinController, obscureText: true, keyboardType: TextInputType.number,
             decoration: const InputDecoration(labelText: 'New PIN (at least 6 digits)')),
           TextField(controller: confirmController, obscureText: true, keyboardType: TextInputType.number,
