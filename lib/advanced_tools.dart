@@ -37,8 +37,13 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
   void initState() {
     super.initState();
     if (widget.openVaultOnStart) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _openVault();
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        await _openVault();
+        // Return to the normal Home screen after the hidden Vault flow closes.
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
       });
     }
   }
