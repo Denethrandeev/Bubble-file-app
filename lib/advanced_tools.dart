@@ -289,30 +289,77 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
   }
 
   Future<void> _scanGpsPhotos() async {
-    final selected = await FilePicker.platform.pickFiles(type: FileType.image, allowMultiple: true, withData: false);
-    if (selected == null) return;
+    if (_busy) return;
     setState(() => _busy = true);
+    _say('Scanning accessible photo folders for GPS metadata…');
     final found = <_GeoPhoto>[];
+    final pending = <Directory>[];
+    final seen = <String>{};
+    const imageExtensions = <String>{
+      'jpg','jpeg','tif','tiff','heic','heif'
+    };
+    var inspected = 0;
     try {
-      for (final item in selected.files) {
-        final path = item.path;
-        if (path == null) continue;
-        final file = File(path);
-        if (await file.length() > 25 * 1024 * 1024) continue;
+      final internal = Directory('/storage/emulated/0');
+      if (await internal.exists()) pending.add(internal);
+      final storage = Directory('/storage');
+      try {
+        if (await storage.exists()) {
+          await for (final entry in storage.list(followLinks: false)) {
+            if (entry is Directory &&
+                entry.path != '/storage/emulated' &&
+                !entry.path.endsWith('/self') &&
+                seen.add(entry.path)) {
+              pending.add(entry);
+            }
+          }
+        }
+      } catch (_) {}
+
+      while (pending.isNotEmpty && inspected < 1800) {
+        final directory = pending.removeLast();
+        if (!seen.add(directory.path) && directory.path != internal.path) continue;
         try {
-          final tags = await readExifFromBytes(await file.readAsBytes());
-          final latTag = tags['GPS GPSLatitude']?.printable;
-          final lonTag = tags['GPS GPSLongitude']?.printable;
-          if (latTag == null || lonTag == null) continue;
-          final latRef = tags['GPS GPSLatitudeRef']?.printable ?? 'N';
-          final lonRef = tags['GPS GPSLongitudeRef']?.printable ?? 'E';
-          final lat = _dmsToDecimal(latTag, latRef);
-          final lon = _dmsToDecimal(lonTag, lonRef);
-          if (lat != null && lon != null) found.add(_GeoPhoto(file, lat, lon));
+          await for (final entity in directory.list(followLinks: false)) {
+            if (entity is Directory) {
+              final path = entity.path;
+              if (!path.contains('/Android/data/') &&
+                  !path.contains('/Android/obb/') &&
+                  !path.contains('/.thumbnails/') &&
+                  !path.contains('/aqua_encrypted_vault/') &&
+                  !path.contains('/aqua_recycle_bin/')) {
+                pending.add(entity);
+              }
+            } else if (entity is File) {
+              final extension = entity.uri.pathSegments.last
+                  .split('.').last.toLowerCase();
+              if (!imageExtensions.contains(extension)) continue;
+              inspected++;
+              try {
+                final length = await entity.length();
+                if (length == 0 || length > 18 * 1024 * 1024) continue;
+                final tags = await readExifFromBytes(await entity.readAsBytes());
+                final latTag = tags['GPS GPSLatitude']?.printable;
+                final lonTag = tags['GPS GPSLongitude']?.printable;
+                if (latTag == null || lonTag == null) continue;
+                final latRef = tags['GPS GPSLatitudeRef']?.printable ?? 'N';
+                final lonRef = tags['GPS GPSLongitudeRef']?.printable ?? 'E';
+                final lat = _dmsToDecimal(latTag, latRef);
+                final lon = _dmsToDecimal(lonTag, lonRef);
+                if (lat != null && lon != null &&
+                    lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+                  found.add(_GeoPhoto(entity, lat, lon));
+                }
+              } catch (_) {}
+              if (inspected >= 1800) break;
+            }
+          }
         } catch (_) {}
       }
       if (mounted) setState(() => _geoPhotos = found);
-      _say('Found GPS coordinates in ${found.length} selected image(s). Images without GPS are kept out of map groups.');
+      _say('Checked $inspected accessible photos. Found GPS location data in ${found.length}. Photos without embedded GPS data cannot be placed on the map.');
+    } catch (e) {
+      _say('Location scan failed: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
