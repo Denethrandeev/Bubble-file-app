@@ -553,11 +553,90 @@ class _AquaAppState extends State<AquaApp> {
     }
   }
 
-  Future<void> _openAdvancedTools() async {
+  Future<void> _openAdvancedTools({bool openVaultOnStart = false}) async {
     await Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => AquaAdvancedTools(targetDirectory: _current, accent: _accent),
+      builder: (_) => AquaAdvancedTools(
+        targetDirectory: _current,
+        accent: _accent,
+        openVaultOnStart: openVaultOnStart,
+      ),
     ));
     if (_hasStorage) await _loadDirectory(_current);
+  }
+
+  int? _secretGesturePointer;
+  final List<Offset> _secretGesturePoints = <Offset>[];
+
+  void _onSecretGestureDown(PointerDownEvent event) {
+    if (_tab != 0 || _secretGesturePointer != null) return;
+    _secretGesturePointer = event.pointer;
+    _secretGesturePoints
+      ..clear()
+      ..add(event.localPosition);
+    setState(() {});
+  }
+
+  void _onSecretGestureMove(PointerMoveEvent event) {
+    if (event.pointer != _secretGesturePointer) return;
+    final last = _secretGesturePoints.isEmpty ? null : _secretGesturePoints.last;
+    if (last == null || (event.localPosition - last).distance >= 3) {
+      _secretGesturePoints.add(event.localPosition);
+      if (mounted) setState(() {});
+    }
+  }
+
+  Future<void> _onSecretGestureUp(PointerUpEvent event) async {
+    if (event.pointer != _secretGesturePointer) return;
+    _secretGesturePoints.add(event.localPosition);
+    final accepted = _isFreehandBox(_secretGesturePoints);
+    _secretGesturePointer = null;
+    _secretGesturePoints.clear();
+    if (mounted) setState(() {});
+    if (!accepted || _tab != 0 || !mounted) return;
+    await HapticFeedback.lightImpact();
+    if (!mounted) return;
+    await _openAdvancedTools(openVaultOnStart: true);
+  }
+
+  void _onSecretGestureCancel(PointerCancelEvent event) {
+    if (event.pointer != _secretGesturePointer) return;
+    _secretGesturePointer = null;
+    _secretGesturePoints.clear();
+    if (mounted) setState(() {});
+  }
+
+  bool _isFreehandBox(List<Offset> points) {
+    if (points.length < 12) return false;
+    var minX = double.infinity, minY = double.infinity;
+    var maxX = -double.infinity, maxY = -double.infinity;
+    var pathLength = 0.0;
+    for (var i = 0; i < points.length; i++) {
+      final p = points[i];
+      minX = math.min(minX, p.dx);
+      minY = math.min(minY, p.dy);
+      maxX = math.max(maxX, p.dx);
+      maxY = math.max(maxY, p.dy);
+      if (i > 0) pathLength += (p - points[i - 1]).distance;
+    }
+    final width = maxX - minX;
+    final height = maxY - minY;
+    final side = math.max(width, height);
+    if (math.min(width, height) < 56 || side == 0) return false;
+    final ratio = width / height;
+    if (ratio < .62 || ratio > 1.6) return false;
+    final startGap = (points.first - points.last).distance;
+    if (startGap > math.max(30.0, side * .28)) return false;
+    if (pathLength < (width + height) * 1.25) return false;
+
+    final cornerRadius = side * .38;
+    final corners = <Offset>[
+      Offset(minX, minY), Offset(maxX, minY),
+      Offset(maxX, maxY), Offset(minX, maxY),
+    ];
+    for (final corner in corners) {
+      if (!points.any((p) => (p - corner).distance <= cornerRadius)) return false;
+    }
+    return true;
   }
 
   Future<void> _createFolder() async {
@@ -891,7 +970,12 @@ class _AquaAppState extends State<AquaApp> {
       home: _showSplash
           ? const BubbleSplashScreen()
           : Scaffold(
-        body: Stack(children: [
+        body: Listener(
+          onPointerDown: _onSecretGestureDown,
+          onPointerMove: _onSecretGestureMove,
+          onPointerUp: _onSecretGestureUp,
+          onPointerCancel: _onSecretGestureCancel,
+          child: Stack(children: [
           Positioned.fill(child: AquaBackdrop(reduced: _performance)),
           if (_animations)
             Positioned.fill(child: BubbleField(
@@ -911,7 +995,11 @@ class _AquaAppState extends State<AquaApp> {
             ])),
             _bottomNav(foreground),
           ])),
-        ]),
+          if (_secretGesturePoints.length > 1)
+            Positioned.fill(child: IgnorePointer(child: CustomPaint(
+              painter: _SecretBoxGesturePainter(_secretGesturePoints),
+            ))),
+        ])),
       ),
     );
   }
@@ -1895,3 +1983,35 @@ class _BubblePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _BubblePainter oldDelegate) => false;
 }
+
+class _SecretBoxGesturePainter extends CustomPainter {
+  const _SecretBoxGesturePainter(this.points);
+  final List<Offset> points;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.length < 2) return;
+    final path = Path()..moveTo(points.first.dx, points.first.dy);
+    for (final point in points.skip(1)) {
+      path.lineTo(point.dx, point.dy);
+    }
+    canvas.drawPath(path, Paint()
+      ..color = const Color(0x665DEBFF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 8
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7));
+    canvas.drawPath(path, Paint()
+      ..color = const Color(0xD6B8F8FF)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SecretBoxGesturePainter oldDelegate) =>
+      oldDelegate.points != points || oldDelegate.points.length != points.length;
+}
+
