@@ -73,6 +73,46 @@ jobs:
               data = data.replace("class MainActivity : FlutterActivity()", "class MainActivity : FlutterFragmentActivity()")
               path.write_text(data)
           PY
+      - name: Add native storage capacity channel
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          files = list(Path("android/app/src/main/kotlin").rglob("MainActivity.kt"))
+          if not files:
+              raise SystemExit("MainActivity.kt not found")
+          for path in files:
+              package_line = next((line for line in path.read_text().splitlines() if line.startswith("package ")), None)
+              if not package_line:
+                  raise SystemExit(f"Package declaration missing in {path}")
+              source = f'''{package_line}
+          import android.os.Environment
+          import android.os.StatFs
+          import io.flutter.embedding.android.FlutterFragmentActivity
+          import io.flutter.embedding.engine.FlutterEngine
+          import io.flutter.plugin.common.MethodChannel
+
+          class MainActivity : FlutterFragmentActivity() {{
+              override fun configureFlutterEngine(flutterEngine: FlutterEngine) {{
+                  super.configureFlutterEngine(flutterEngine)
+                  MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aqua/storage")
+                      .setMethodCallHandler {{ call, result ->
+                          if (call.method == "storageInfo") {{
+                              try {{
+                                  val stats = StatFs(Environment.getExternalStorageDirectory().absolutePath)
+                                  result.success(mapOf("total" to stats.totalBytes, "free" to stats.availableBytes))
+                              }} catch (error: Exception) {{
+                                  result.error("STORAGE_INFO_FAILED", error.message, null)
+                              }}
+                          }} else {{
+                              result.notImplemented()
+                          }}
+                      }}
+              }}
+          }}
+          '''
+              path.write_text(source)
+              print(f"Installed storage stats channel in {path}")
+          PY
       - name: Resolve packages
         run: flutter pub get
       - name: Align Android plugin compile SDK
