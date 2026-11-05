@@ -99,6 +99,8 @@ jobs:
               if not package_line:
                   raise SystemExit(f"Package declaration missing in {path}")
               source = f'''{package_line}
+          import android.app.ActivityManager
+          import android.os.Build
           import android.os.Environment
           import android.os.StatFs
           import io.flutter.embedding.android.FlutterFragmentActivity
@@ -110,15 +112,41 @@ jobs:
                   super.configureFlutterEngine(flutterEngine)
                   MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "aqua/storage")
                       .setMethodCallHandler {{ call, result ->
-                          if (call.method == "storageInfo") {{
-                              try {{
-                                  val stats = StatFs(Environment.getExternalStorageDirectory().absolutePath)
-                                  result.success(mapOf("total" to stats.totalBytes, "free" to stats.availableBytes))
-                              }} catch (error: Exception) {{
-                                  result.error("STORAGE_INFO_FAILED", error.message, null)
+                          try {{
+                              when (call.method) {{
+                                  "storageInfo" -> {{
+                                      val stats = StatFs(Environment.getExternalStorageDirectory().absolutePath)
+                                      result.success(mapOf("total" to stats.totalBytes, "free" to stats.availableBytes))
+                                  }}
+                                  "deviceDiagnostics" -> {{
+                                      val manager = getSystemService(ACTIVITY_SERVICE) as ActivityManager
+                                      val memory = ActivityManager.MemoryInfo()
+                                      manager.getMemoryInfo(memory)
+                                      val volumes = getExternalFilesDirs(null).filterNotNull().map {{ directory ->
+                                          val rawPath = directory.absolutePath
+                                          val marker = "/Android/data/"
+                                          val root = if (rawPath.contains(marker)) rawPath.substringBefore(marker) else rawPath
+                                          mapOf(
+                                              "path" to root,
+                                              "removable" to Environment.isExternalStorageRemovable(directory),
+                                              "state" to Environment.getExternalStorageState(directory)
+                                          )
+                                      }}
+                                      val allFilesAccess = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
+                                          Environment.isExternalStorageManager() else true
+                                      result.success(mapOf(
+                                          "sdkInt" to Build.VERSION.SDK_INT,
+                                          "allFilesAccess" to allFilesAccess,
+                                          "totalRamBytes" to memory.totalMem,
+                                          "availableRamBytes" to memory.availMem,
+                                          "lowMemory" to memory.lowMemory,
+                                          "volumes" to volumes
+                                      ))
+                                  }}
+                                  else -> result.notImplemented()
                               }}
-                          }} else {{
-                              result.notImplemented()
+                          }} catch (error: Exception) {{
+                              result.error("DEVICE_DIAGNOSTICS_FAILED", error.message, null)
                           }}
                       }}
               }}
