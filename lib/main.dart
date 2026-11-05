@@ -157,6 +157,7 @@ class _AquaAppState extends State<AquaApp> {
   bool _hasStorage = false;
   int _storageTotalBytes = 0;
   int _storageFreeBytes = 0;
+  List<Map<String, dynamic>> _storageVolumes = <Map<String, dynamic>>[];
   String _storageMessage = 'Allow access to browse your phone storage.';
   Directory _root = Directory('/storage/emulated/0');
   Directory _current = Directory('/storage/emulated/0');
@@ -227,6 +228,7 @@ class _AquaAppState extends State<AquaApp> {
       if (status.isGranted) {
         await _loadStorageInfo();
         await _discoverStorageRoots();
+        await _loadStorageVolumes();
         await _loadDirectory(_root);
       }
     } catch (e) {
@@ -250,6 +252,82 @@ class _AquaAppState extends State<AquaApp> {
     } catch (_) {
       // Keep the storage card usable even if a device blocks the native stat call.
     }
+  }
+
+  Future<void> _loadStorageVolumes() async {
+    try {
+      final values = await const MethodChannel('aqua/storage')
+          .invokeListMethod<dynamic>('storageVolumes');
+      if (!mounted || values == null) return;
+      final volumes = values.whereType<Map>().map((value) =>
+          Map<String, dynamic>.from(value)).where((value) =>
+          value['path'] is String && (value['total'] as num? ?? 0) > 0).toList();
+      if (!mounted) return;
+      setState(() => _storageVolumes = volumes);
+    } catch (_) {
+      // Keep the existing internal-storage indicator if this device lacks volume stats.
+    }
+  }
+
+  Future<void> _refreshStorageVolumes() async {
+    await _discoverStorageRoots();
+    await _loadStorageInfo();
+    await _loadStorageVolumes();
+  }
+
+  Color _volumeStatusColor(double used) {
+    if (used >= .90) return const Color(0xFFFF5268);
+    if (used >= .70) return const Color(0xFFFFC15A);
+    return const Color(0xFF35D6B0);
+  }
+
+  Widget _storageVolumeDrop(Map<String, dynamic> volume) {
+    final path = volume['path'] as String? ?? '';
+    final total = (volume['total'] as num?)?.toInt() ?? 0;
+    final free = (volume['free'] as num?)?.toInt() ?? 0;
+    final used = total <= 0 ? 0.0 : ((total - free) / total).clamp(0.0, 1.0);
+    final removable = volume['removable'] == true;
+    final label = removable ? 'EXTERNAL' : 'INTERNAL';
+    final selected = _root.path == path;
+    final color = _volumeStatusColor(used);
+    return InkWell(
+      onTap: path.isEmpty ? null : () {
+        final directory = Directory(path);
+        setState(() => _root = directory);
+        _loadDirectory(directory);
+        setState(() => _tab = 1);
+      },
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        width: 142,
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? _accent.withOpacity(.12) : Colors.white.withOpacity(.035),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: selected ? _accent.withOpacity(.65) : Colors.white.withOpacity(.10)),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          CustomPaint(
+            size: const Size(48, 58),
+            painter: _StorageDropPainter(
+              fraction: used,
+              color: color,
+              active: total > 0,
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 9, letterSpacing: 1.1, color: color, fontWeight: FontWeight.w800)),
+          Text('${(used * 100).round()}% used',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+          Text('${_formatBytes(total - free)} / ${_formatBytes(total)}',
+            maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 9, color: Colors.white60)),
+          Text(removable ? 'SD / USB' : 'Phone',
+            style: const TextStyle(fontSize: 9, color: Colors.white38)),
+        ]),
+      ),
+    );
   }
 
   double get _storageUsedFraction {
@@ -1156,35 +1234,50 @@ class _AquaAppState extends State<AquaApp> {
       Text('Your space,', style: TextStyle(fontSize: 29, fontWeight: FontWeight.w300, color: foreground)),
       Text('beautifully organized.', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: foreground)),
       const SizedBox(height: 20),
-      _glass(child: Row(children: [
-        CustomPaint(
-          size: const Size(58, 70),
-          painter: _StorageDropPainter(
-            fraction: _storageUsedFraction,
-            color: _storageStatusColor,
-            active: _hasStorage && _storageTotalBytes > 0,
+      _glass(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Expanded(child: Text('STORAGE DROPS', style: TextStyle(fontSize: 10, letterSpacing: 1.7, color: Colors.white60))),
+          IconButton(
+            tooltip: 'Refresh connected storage',
+            visualDensity: VisualDensity.compact,
+            onPressed: _hasStorage ? _refreshStorageVolumes : _requestStorage,
+            icon: Icon(Icons.refresh_rounded, color: _accent, size: 19),
           ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('PHONE STORAGE', style: TextStyle(fontSize: 10, letterSpacing: 1.6, color: Colors.white60)),
-          Text(_hasStorage
-              ? (_storageTotalBytes > 0
-                  ? '${(_storageUsedFraction * 100).round()}% used'
-                  : 'Access enabled')
-              : 'Permission required',
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-          Text(_storageTotalBytes > 0
-              ? '${_formatBytes(_storageTotalBytes - _storageFreeBytes)} used • ${_formatBytes(_storageTotalBytes)} total'
-              : 'Internal storage browser',
-            style: const TextStyle(fontSize: 10, color: Colors.white54)),
-          const SizedBox(height: 5),
-          Text(_storageUsedFraction >= .90
-              ? 'Storage almost full'
-              : _storageUsedFraction >= .70 ? 'Storage filling up' : 'Storage available',
-            style: TextStyle(fontSize: 11, color: _storageStatusColor, fontWeight: FontWeight.w700)),
-        ])),
-        Icon(_hasStorage ? Icons.check_circle_rounded : Icons.lock_outline_rounded, color: _accent),
+        ]),
+        if (!_hasStorage)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text('Allow storage access to show your storage drops.',
+              style: TextStyle(fontSize: 12, color: Colors.white60)),
+          )
+        else if (_storageVolumes.isNotEmpty)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _storageVolumes.map((volume) => Padding(
+                padding: const EdgeInsets.only(right: 9),
+                child: _storageVolumeDrop(volume),
+              )).toList(),
+            ),
+          )
+        else
+          Row(children: [
+            CustomPaint(
+              size: const Size(48, 58),
+              painter: _StorageDropPainter(
+                fraction: _storageUsedFraction,
+                color: _storageStatusColor,
+                active: _storageTotalBytes > 0,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Text(
+              _storageTotalBytes > 0
+                ? '${_formatBytes(_storageTotalBytes - _storageFreeBytes)} used • ${_formatBytes(_storageTotalBytes)} total'
+                : 'Internal storage is connected',
+              style: const TextStyle(fontSize: 11, color: Colors.white70),
+            )),
+          ]),
       ])),
       const SizedBox(height: 20),
       const Text('EXPLORE', style: TextStyle(fontSize: 10, letterSpacing: 2, color: Colors.white60)),
