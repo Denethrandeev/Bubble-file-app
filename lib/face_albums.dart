@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:face_detection_tflite/face_detection_tflite.dart' as face_ml;
 import 'package:flutter/material.dart';
@@ -185,7 +184,7 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
                 final cluster = clusters[i];
                 var score = -1.0;
                 for (final sample in cluster.samples) {
-                  score = math.max(score, _cosine(sample, embedding));
+                  score = math.max(score, _cosine(sample, embedding)).toDouble();
                 }
                 if (score > bestScore) {
                   secondScore = bestScore;
