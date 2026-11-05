@@ -1863,9 +1863,9 @@ class _BubblePainter extends CustomPainter {
         ..shader = RadialGradient(
           center: const Alignment(-.34, -.38),
           colors: [
-            Colors.white.withOpacity(b.opacity * .95),
-            color.withOpacity(b.opacity * .62),
-            color.withOpacity(b.opacity * .10),
+            Colors.white.withOpacity(bubbleOpacity * .95),
+            color.withOpacity(bubbleOpacity * .62),
+            color.withOpacity(bubbleOpacity * .10),
           ],
         ).createShader(rect);
       canvas.drawCircle(Offset(b.x, b.y), bubbleRadius, paint);
