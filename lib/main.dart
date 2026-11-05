@@ -36,7 +36,7 @@ class _AquaAppState extends State<AquaApp> {
   int _theme = 0;
   bool _gravity = true;
   bool _animations = true;
-  bool _performance = false;
+  bool _performance = true;
   bool _light = false;
   bool _checkingPermission = false;
   bool _hasStorage = false;
@@ -1020,7 +1020,7 @@ class _AquaAppState extends State<AquaApp> {
   Widget _glass({required Widget child}) => ClipRRect(
     borderRadius: BorderRadius.circular(23),
     child: BackdropFilter(
-      filter: ui.ImageFilter.blur(sigmaX: 26, sigmaY: 26),
+      filter: ui.ImageFilter.blur(sigmaX: _performance ? 0 : 26, sigmaY: _performance ? 0 : 26),
       child: Container(
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
@@ -1028,7 +1028,7 @@ class _AquaAppState extends State<AquaApp> {
             colors: [Colors.white.withOpacity(.14), Colors.white.withOpacity(.045)]),
           borderRadius: BorderRadius.circular(23),
           border: Border.all(color: Colors.white.withOpacity(.17), width: 1),
-          boxShadow: [BoxShadow(color: _accent.withOpacity(.055), blurRadius: 24)],
+          boxShadow: _performance ? const [] : [BoxShadow(color: _accent.withOpacity(.055), blurRadius: 24)],
         ),
         child: child,
       ),
@@ -1040,7 +1040,7 @@ class _AquaAppState extends State<AquaApp> {
     child: ClipRRect(
       borderRadius: BorderRadius.circular(25),
       child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        filter: ui.ImageFilter.blur(sigmaX: _performance ? 0 : 22, sigmaY: _performance ? 0 : 22),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 7),
           decoration: BoxDecoration(
@@ -1163,7 +1163,7 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
     final now = _ticker.lastElapsedDuration?.inMicroseconds.toDouble() ?? 0;
     final dt = _lastTick == 0 ? 1.0 : ((now - _lastTick) / 16667).clamp(0.0, 2.0).toDouble();
     _lastTick = now;
-    final count = widget.reduced ? 10 : (_size.width < 520 ? 20 : 28);
+    final count = widget.reduced ? 5 : (_size.width < 520 ? 20 : 28);
     while (_bubbles.length < count) {
       _bubbles.add(_createBubble(y: _random.nextDouble() * _size.height));
     }
