@@ -56,6 +56,7 @@ class _AquaAppState extends State<AquaApp> {
   FileSystemEntity? _clipboardEntity;
   bool _clipboardMove = false;
   Timer? _recycleTimer;
+  List<String> _storageRoots = <String>['/storage/emulated/0'];
   static const FlutterSecureStorage _folderPinStore = FlutterSecureStorage();
 
   Color get _accent => aquaAccents[_theme];
@@ -91,6 +92,7 @@ class _AquaAppState extends State<AquaApp> {
             : 'Android requires All files access. The system may open a Settings page; enable “Allow access to manage all files”, return to Aqua, then tap Check permission.';
       });
       if (status.isGranted) {
+        await _discoverStorageRoots();
         await _loadDirectory(_root);
       }
     } catch (e) {
@@ -280,6 +282,26 @@ class _AquaAppState extends State<AquaApp> {
     if (remaining.isNegative) return 'Expiring…';
     if (stage == 'shred') return '${remaining.inHours}h ${remaining.inMinutes.remainder(60)}m left';
     return '${remaining.inDays}d ${remaining.inHours.remainder(24)}h left';
+  }
+
+  Future<void> _discoverStorageRoots() async {
+    final found = <String>{'/storage/emulated/0'};
+    for (final mountPath in <String>['/storage', '/mnt/media_rw']) {
+      try {
+        final mount = Directory(mountPath);
+        if (!await mount.exists()) continue;
+        await for (final entry in mount.list(followLinks: false)) {
+          if (entry is! Directory) continue;
+          if (entry.path == '/storage/emulated') {
+            final internal = Directory('/storage/emulated/0');
+            if (await internal.exists()) found.add(internal.path);
+          } else if (!entry.path.endsWith('/self') && !entry.path.endsWith('/emulated')) {
+            found.add(entry.path);
+          }
+        }
+      } catch (_) {}
+    }
+    if (mounted) setState(() => _storageRoots = found.toList()..sort());
   }
 
   Future<void> _loadDirectory(Directory directory) async {
@@ -820,6 +842,17 @@ class _AquaAppState extends State<AquaApp> {
               }, icon: const Icon(Icons.arrow_back_rounded, size: 19)),
               Expanded(child: Text(_current.path, maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 10, color: Colors.white60))),
+              PopupMenuButton<String>(
+                tooltip: 'Switch storage volume',
+                icon: Icon(Icons.sd_storage_rounded, color: _accent, size: 19),
+                onSelected: (path) {
+                  final volume = Directory(path);
+                  setState(() => _root = volume);
+                  _loadDirectory(volume);
+                },
+                itemBuilder: (context) => _storageRoots.map((path) =>
+                  PopupMenuItem(value: path, child: Text(path, maxLines: 1, overflow: TextOverflow.ellipsis))).toList(),
+              ),
               PopupMenuButton<String>(
                 tooltip: 'Sort files',
                 onSelected: (value) => setState(() {
