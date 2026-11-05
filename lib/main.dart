@@ -307,15 +307,8 @@ class _AquaAppState extends State<AquaApp> {
   Future<void> _loadDirectory(Directory directory) async {
     if (!_hasStorage && !await Permission.manageExternalStorage.isGranted) return;
     try {
-      final entries = await directory.list(followLinks: false).toList();
-      entries.sort((a, b) {
-        if (_foldersFirst) {
-          final ad = a is Directory ? 0 : 1;
-          final bd = b is Directory ? 0 : 1;
-          if (ad != bd) return ad.compareTo(bd);
-        }
-        return _nameOf(a).toLowerCase().compareTo(_nameOf(b).toLowerCase());
-      });
+      // Keep the directory read simple; the visible list applies the selected
+      // sort once when the Files view is built (avoids sorting twice).
       if (!mounted) return;
       setState(() {
         _current = directory;
@@ -677,7 +670,7 @@ class _AquaAppState extends State<AquaApp> {
       ),
       home: Scaffold(
         body: Stack(children: [
-          const Positioned.fill(child: AquaBackdrop()),
+          Positioned.fill(child: AquaBackdrop(reduced: _performance)),
           if (_animations)
             Positioned.fill(child: BubbleField(
               key: const ValueKey('aqua-bubbles'),
@@ -798,6 +791,7 @@ class _AquaAppState extends State<AquaApp> {
   );
 
   Widget _files(Color foreground) {
+    final visibleItems = visibleItems;
     return Column(children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(19, 8, 19, 10),
@@ -880,13 +874,13 @@ class _AquaAppState extends State<AquaApp> {
           ]),
         )),
         const SizedBox(height: 8),
-        Expanded(child: _visibleItems.isEmpty
+        Expanded(child: visibleItems.isEmpty
           ? const Center(child: Text('This folder is empty', style: TextStyle(color: Colors.white54)))
           : ListView.builder(
               padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
-              itemCount: _visibleItems.length,
+              itemCount: visibleItems.length,
               itemBuilder: (context, index) {
-                final item = _visibleItems[index];
+                final item = visibleItems[index];
                 final isFolder = item is Directory;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 7),
@@ -1017,23 +1011,39 @@ class _AquaAppState extends State<AquaApp> {
       subtitle: Text(subtitle, style: const TextStyle(fontSize: 10, color: Colors.white54)),
     )));
 
-  Widget _glass({required Widget child}) => ClipRRect(
-    borderRadius: BorderRadius.circular(23),
-    child: BackdropFilter(
-      filter: ui.ImageFilter.blur(sigmaX: _performance ? 0 : 26, sigmaY: _performance ? 0 : 26),
-      child: Container(
+  Widget _glass({required Widget child}) {
+    final radius = BorderRadius.circular(23);
+    // On low-RAM phones, avoid a BackdropFilter/compositing layer for every
+    // file row. Keep a translucent glass-like surface without live blur.
+    if (_performance) {
+      return Container(
         padding: const EdgeInsets.all(15),
         decoration: BoxDecoration(
-          gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
-            colors: [Colors.white.withOpacity(.14), Colors.white.withOpacity(.045)]),
-          borderRadius: BorderRadius.circular(23),
-          border: Border.all(color: Colors.white.withOpacity(.17), width: 1),
-          boxShadow: _performance ? const [] : [BoxShadow(color: _accent.withOpacity(.055), blurRadius: 24)],
+          color: Colors.white.withOpacity(.075),
+          borderRadius: radius,
+          border: Border.all(color: Colors.white.withOpacity(.15), width: 1),
         ),
         child: child,
+      );
+    }
+    return ClipRRect(
+      borderRadius: radius,
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 26, sigmaY: 26),
+        child: Container(
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
+              colors: [Colors.white.withOpacity(.14), Colors.white.withOpacity(.045)]),
+            borderRadius: radius,
+            border: Border.all(color: Colors.white.withOpacity(.17), width: 1),
+            boxShadow: [BoxShadow(color: _accent.withOpacity(.055), blurRadius: 24)],
+          ),
+          child: child,
+        ),
       ),
-    ),
-  );
+    );
+  }
 
   Widget _bottomNav(Color foreground) => Padding(
     padding: const EdgeInsets.fromLTRB(19, 7, 19, 11),
@@ -1072,32 +1082,38 @@ class _AquaAppState extends State<AquaApp> {
 }
 
 class AquaBackdrop extends StatelessWidget {
-  const AquaBackdrop({super.key});
+  const AquaBackdrop({super.key, this.reduced = false});
+  final bool reduced;
   @override
-  Widget build(BuildContext context) => const DecoratedBox(
-    decoration: BoxDecoration(
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: const BoxDecoration(
       color: Color(0xFF04141E),
       gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
         colors: [Color(0xFF071E2A), Color(0xFF04141E), Color(0xFF031018)]),
     ),
     child: Stack(children: [
-      Positioned(left: -100, top: -100, child: _Glow(color: Color(0x4420E4E8), size: 310)),
-      Positioned(right: -130, top: 80, child: _Glow(color: Color(0x222E83C5), size: 330)),
-      Positioned(bottom: -160, left: 20, child: _Glow(color: Color(0x2221B8A8), size: 390)),
+      Positioned(left: -100, top: -100, child: _Glow(color: const Color(0x4420E4E8), size: 310, reduced: reduced)),
+      Positioned(right: -130, top: 80, child: _Glow(color: const Color(0x222E83C5), size: 330, reduced: reduced)),
+      Positioned(bottom: -160, left: 20, child: _Glow(color: const Color(0x2221B8A8), size: 390, reduced: reduced)),
     ]),
   );
 }
 
 class _Glow extends StatelessWidget {
-  const _Glow({required this.color, required this.size});
+  const _Glow({required this.color, required this.size, required this.reduced});
   final Color color;
   final double size;
+  final bool reduced;
   @override
-  Widget build(BuildContext context) => ImageFiltered(
-    imageFilter: ui.ImageFilter.blur(sigmaX: 55, sigmaY: 55),
-    child: Container(width: size, height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color)),
-  );
+  Widget build(BuildContext context) {
+    final circle = Container(width: size, height: size,
+      decoration: BoxDecoration(shape: BoxShape.circle, color: color));
+    // Static soft color is cheaper than a full-screen image blur.
+    return reduced ? circle : ImageFiltered(
+      imageFilter: ui.ImageFilter.blur(sigmaX: 55, sigmaY: 55),
+      child: circle,
+    );
+  }
 }
 
 class _Bubble {
@@ -1132,6 +1148,7 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
   Offset? _gravityBaseline;
   Offset? _finger;
   double _lastTick = 0;
+  double _lastReducedFrame = 0;
 
   @override
   void initState() {
@@ -1161,6 +1178,10 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
   void _advance() {
     if (!mounted || _size.isEmpty) return;
     final now = _ticker.lastElapsedDuration?.inMicroseconds.toDouble() ?? 0;
+    // Cap the low-memory bubble layer at about 30 FPS instead of repainting
+    // on every display tick. Full mode keeps the normal frame rate.
+    if (widget.reduced && now - _lastReducedFrame < 33333) return;
+    if (widget.reduced) _lastReducedFrame = now;
     final dt = _lastTick == 0 ? 1.0 : ((now - _lastTick) / 16667).clamp(0.0, 2.0).toDouble();
     _lastTick = now;
     final count = widget.reduced ? 5 : (_size.width < 520 ? 20 : 28);
