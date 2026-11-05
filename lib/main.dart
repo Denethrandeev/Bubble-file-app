@@ -228,7 +228,7 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
   Bubble _newBubble({double? y}) {
     final r = 11 + random.nextDouble() * 33;
     final hue = HSLColor.fromColor(widget.accent).hue + random.nextDouble() * 24 - 12;
-    return Bubble(r, random.nextDouble() * math.max(1, size.width), y ?? size.height + r,
+    return Bubble(r, random.nextDouble() * math.max(1, size.width).toDouble(), y ?? size.height + r,
       (random.nextDouble() - .5) * .3, -.25 - random.nextDouble() * .7,
       random.nextDouble() * math.pi * 2, .7 + random.nextDouble() * .8,
       .20 + random.nextDouble() * .34, hue);
@@ -249,7 +249,7 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
       b.x += b.vx * b.speed * dt * 8;
       b.y += b.vy * b.speed * dt * 8;
       if (b.x < b.r || b.x > size.width - b.r) b.vx *= -.72;
-      b.x = b.x.clamp(b.r, math.max(b.r, size.width - b.r));
+      b.x = b.x.clamp(b.r, math.max(b.r, size.width - b.r)).toDouble();
       if (b.y < -b.r - 50) b.vy = b.vy.abs() * .25;
       if (b.y > size.height + b.r) {
         final fresh = _newBubble();
@@ -293,7 +293,7 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
     size = Size(constraints.maxWidth, constraints.maxHeight);
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
-      onPanDown: (d) => pointer = Offset((d.localPosition.dx / math.max(1, size.width)).clamp(0, 1), 0),
+      onPanDown: (d) => pointer = Offset((d.localPosition.dx / math.max(1, size.width)).clamp(0, 1).toDouble(), 0),
       onTapDown: (d) {
         final p = d.localPosition;
         var best = -1, bestDistance = double.infinity;
