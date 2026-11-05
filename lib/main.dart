@@ -37,7 +37,7 @@ class _LiquidSurfacePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (size.isEmpty) return;
+    if (size.isEmpty || !enabled) return;
     final slope = enabled ? (tilt.dx * .12).clamp(-.13, .13) : 0.0;
     final base = size.height * .91;
     final path = Path()..moveTo(0, base + slope * size.height);
@@ -145,6 +145,7 @@ class _AquaAppState extends State<AquaApp> {
   int _tab = 0;
   int _theme = 0;
   bool _gravity = true;
+  bool _waterEnabled = true;
   Offset _waterTilt = Offset.zero;
   Offset? _waterBaseline;
   StreamSubscription<AccelerometerEvent>? _waterSensor;
@@ -1381,8 +1382,10 @@ class _AquaAppState extends State<AquaApp> {
         (v) => setState(() => _showHidden = v)),
       _switchTile('Gravity bubbles', 'Move with your phone tilt sensor', _gravity,
         (v) => setState(() => _gravity = v)),
-      _switchTile('Bubble animation', 'Show floating water bubbles', _animations,
+      _switchTile('Bubbles', 'Show or hide floating bubbles and bubble effects', _animations,
         (v) => setState(() => _animations = v)),
+      _switchTile('Water', 'Show or hide the liquid layer inside every glass card', _waterEnabled,
+        (v) => setState(() => _waterEnabled = v)),
       _switchTile('Performance mode', 'Use fewer bubbles and less motion work', _performance,
         (v) => setState(() => _performance = v)),
       const SizedBox(height: 10),
@@ -1443,7 +1446,7 @@ class _AquaAppState extends State<AquaApp> {
           painter: _LiquidSurfacePainter(
             accent: _accent,
             tilt: _waterTilt,
-            enabled: _gravity,
+            enabled: _gravity && _waterEnabled,
           ),
         ))),
       ],
