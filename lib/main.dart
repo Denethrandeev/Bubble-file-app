@@ -190,12 +190,13 @@ class _AquaAppState extends State<AquaApp> {
       _message('This item is already in the current folder.');
       return;
     }
+    final wasMove = _clipboardMove;
     try {
       await _copyEntityRecursively(source, target);
-      if (_clipboardMove) await _deleteEntityPermanently(source.path);
+      if (wasMove) await _deleteEntityPermanently(source.path);
       if (mounted) setState(() { _clipboardEntity = null; _clipboardMove = false; });
       await _loadDirectory(_current);
-      _message(_clipboardMove ? 'Moved successfully.' : 'Copied successfully.');
+      _message(wasMove ? 'Moved successfully.' : 'Copied successfully.');
     } catch (e) {
       _message('Copy or move failed: ' + e.toString());
     }
