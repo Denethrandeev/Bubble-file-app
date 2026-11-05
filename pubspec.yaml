@@ -15,6 +15,13 @@ dependencies:
   path_provider: ^2.1.5
   share_plus: ^10.1.4
   crypto: ^3.0.6
+  url_launcher: ^6.3.1
+  exif: ^3.3.0
+  cryptography: ^2.7.0
+  local_auth: ^2.3.0
+  flutter_secure_storage: ^9.2.4
+  file_picker: ^8.1.7
+  archive: ^3.6.1
 
 dev_dependencies:
   flutter_test:
