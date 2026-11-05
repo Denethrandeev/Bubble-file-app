@@ -106,7 +106,7 @@ jobs:
                           lines[i] = indent + "compileSdkVersion 36"
                       count += 1
               if count:
-                  gradle.write_text("\\n".join(lines) + "\\n")
+                  gradle.write_text("\n".join(lines) + "\n")
                   changed.append(f"{gradle} ({count} setting(s))")
           if not changed:
               for path in candidates:
