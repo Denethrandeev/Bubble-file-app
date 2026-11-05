@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -43,6 +44,8 @@ class _AquaAppState extends State<AquaApp> {
   List<FileSystemEntity> _items = <FileSystemEntity>[];
   String _search = '';
   bool _foldersFirst = true;
+  bool _showHidden = false;
+  bool _scanningDuplicates = false;
   String _fileCategory = 'All files';
   String _sortMode = 'Name';
   Directory? _recycleDirectory;
@@ -332,6 +335,7 @@ class _AquaAppState extends State<AquaApp> {
 
   List<FileSystemEntity> get _visibleItems {
     final items = _items.where((item) =>
+      (_showHidden || !_nameOf(item).startsWith('.')) &&
       _nameOf(item).toLowerCase().contains(_search.toLowerCase()) &&
       _matchesCategory(item)).toList();
     items.sort((a, b) {
@@ -356,6 +360,87 @@ class _AquaAppState extends State<AquaApp> {
       }
     });
     return items;
+  }
+
+  Future<void> _findDuplicates() async {
+    if (_scanningDuplicates || !_hasStorage) return;
+    setState(() => _scanningDuplicates = true);
+    _message('Scanning storage for identical files…');
+    try {
+      final bySize = <int, List<File>>{};
+      final pending = <Directory>[_root];
+      var visited = 0;
+      while (pending.isNotEmpty && visited < 15000) {
+        final directory = pending.removeLast();
+        try {
+          await for (final entity in directory.list(followLinks: false)) {
+            if (entity is Directory) {
+              final path = entity.path;
+              if (!path.contains('/Android/data/') &&
+                  !path.contains('/Android/obb/') &&
+                  !path.contains('/aqua_recycle_bin/')) {
+                pending.add(entity);
+              }
+            } else if (entity is File) {
+              visited++;
+              try {
+                final size = await entity.length();
+                if (size > 0) (bySize[size] ??= <File>[]).add(entity);
+              } catch (_) {}
+            }
+            if (visited >= 15000) break;
+          }
+        } catch (_) {}
+      }
+      final byHash = <String, List<File>>{};
+      for (final candidates in bySize.values.where((items) => items.length > 1)) {
+        for (final file in candidates) {
+          try {
+            final digest = await sha256.bind(file.openRead()).first;
+            (byHash[digest.toString()] ??= <File>[]).add(file);
+          } catch (_) {}
+        }
+      }
+      final groups = byHash.values.where((items) => items.length > 1).toList();
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: const Color(0xFF102B38),
+          title: const Text('Identical files'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: groups.isEmpty
+              ? Text('No byte-identical duplicate files found in the scanned area. Scanned up to $visited files.')
+              : ListView(
+                  shrinkWrap: true,
+                  children: groups.map((group) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${group.length} identical copies • ${_formatBytes(await _safeLength(group.first))}',
+                          style: const TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 5),
+                        ...group.map((file) => Text(file.path,
+                          style: const TextStyle(fontSize: 11, color: Colors.white70))),
+                      ],
+                    ),
+                  )).toList(),
+                ),
+          ),
+          actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close'))],
+        ),
+      );
+    } catch (e) {
+      _message('Duplicate scan failed: $e');
+    } finally {
+      if (mounted) setState(() => _scanningDuplicates = false);
+    }
+  }
+
+  Future<int> _safeLength(File file) async {
+    try { return await file.length(); } catch (_) { return 0; }
   }
 
   Future<void> _createFolder() async {
@@ -603,6 +688,7 @@ class _AquaAppState extends State<AquaApp> {
         child: Row(children: [
           Expanded(child: Text(_fileCategory, style: TextStyle(fontSize: 27,
             fontWeight: FontWeight.w800, color: foreground))),
+          IconButton(onPressed: _scanningDuplicates ? null : _findDuplicates, tooltip: 'Find identical files', icon: Icon(Icons.copy_all_rounded, color: _accent)),
           if (_clipboardEntity != null)
             IconButton(onPressed: _pasteClipboard, tooltip: 'Paste', icon: Icon(Icons.content_paste_rounded, color: _accent)),
           IconButton(onPressed: _createFolder, tooltip: 'New folder', icon: Icon(Icons.create_new_folder_rounded, color: _accent)),
@@ -767,7 +853,7 @@ class _AquaAppState extends State<AquaApp> {
         ),
       ])),
       const SizedBox(height: 12),
-      _switchTile('Gravity bubbles', 'Move with your phone tilt sensor', _gravity,
+      _switchTile('Show hidden files', 'Include dot-prefixed files and folders', _showHidden,\n        (v) => setState(() => _showHidden = v)),\n      _switchTile('Gravity bubbles', 'Move with your phone tilt sensor', _gravity,
         (v) => setState(() => _gravity = v)),
       _switchTile('Bubble animation', 'Show floating water bubbles', _animations,
         (v) => setState(() => _animations = v)),
