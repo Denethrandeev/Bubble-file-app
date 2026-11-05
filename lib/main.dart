@@ -805,14 +805,6 @@ class _AquaAppState extends State<AquaApp> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value)));
   }
 
-  @override
-  void dispose() {
-    _recycleTimer?.cancel();
-    _mediaAudioPlayer.dispose();
-    super.dispose();
-  }
-
-
   Future<bool> _unlockFolderIfNeeded(Directory directory) async {
     final key = 'aqua_folder_pin_${sha256.convert(utf8.encode(directory.path))}';
     final stored = await _folderPinStore.read(key: key);
