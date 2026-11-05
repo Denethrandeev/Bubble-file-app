@@ -1359,7 +1359,7 @@ class _AquaAppState extends State<AquaApp> {
                         if (value == 'folder_pin' && item is Directory) _setFolderPin(item);
                       },
                       itemBuilder: (context) => [
-                        if (item is Directory) const PopupMenuItem(value: 'folder_pin', child: Text('Set / remove Folder PIN')),
+                        if (item is Directory) const PopupMenuItem(value: 'folder_pin', child: Text('Set / remove in-app Folder PIN')),
                         const PopupMenuItem(value: 'copy', child: Text('Copy')),
                         PopupMenuItem(value: 'cut', child: Text('Cut')),
                         PopupMenuItem(value: 'rename', child: Text('Rename')),
