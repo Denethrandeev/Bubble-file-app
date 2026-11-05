@@ -27,6 +27,8 @@ jobs:
               <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
               <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
               <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+              <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+              <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
           """
           if "android.permission.MANAGE_EXTERNAL_STORAGE" not in data:
               data = data.replace("<application", permissions + "    <application", 1)
