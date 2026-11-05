@@ -27,6 +27,61 @@ const List<Color> aquaAccents = <Color>[
   Color(0xFFFF83C5),
 ];
 
+class _StorageDropPainter extends CustomPainter {
+  const _StorageDropPainter({
+    required this.fraction,
+    required this.color,
+    required this.active,
+  });
+
+  final double fraction;
+  final Color color;
+  final bool active;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..moveTo(size.width * .5, size.height * .04)
+      ..cubicTo(size.width * .40, size.height * .22, size.width * .08,
+          size.height * .48, size.width * .08, size.height * .68)
+      ..cubicTo(size.width * .08, size.height * .91, size.width * .25,
+          size.height * .99, size.width * .5, size.height * .99)
+      ..cubicTo(size.width * .75, size.height * .99, size.width * .92,
+          size.height * .91, size.width * .92, size.height * .68)
+      ..cubicTo(size.width * .92, size.height * .48, size.width * .60,
+          size.height * .22, size.width * .5, size.height * .04)
+      ..close();
+
+    canvas.drawPath(path, Paint()
+      ..color = Colors.white.withOpacity(.10)
+      ..style = PaintingStyle.fill);
+    canvas.save();
+    canvas.clipPath(path);
+    if (active) {
+      final top = size.height * (1 - fraction.clamp(0.0, 1.0));
+      canvas.drawRect(Rect.fromLTRB(0, top, size.width, size.height),
+        Paint()..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [color.withOpacity(.55), color],
+        ).createShader(Offset.zero & size));
+    }
+    canvas.restore();
+    canvas.drawPath(path, Paint()
+      ..color = color.withOpacity(.9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.7);
+    canvas.drawCircle(Offset(size.width * .35, size.height * .45),
+      size.width * .055, Paint()..color = Colors.white.withOpacity(.65));
+  }
+
+  @override
+  bool shouldRepaint(covariant _StorageDropPainter oldDelegate) =>
+      oldDelegate.fraction != fraction ||
+      oldDelegate.color != color ||
+      oldDelegate.active != active;
+}
+
 class AquaApp extends StatefulWidget {
   const AquaApp({super.key});
   @override
