@@ -649,9 +649,10 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
 
       if (b.x < b.r) { b.x = b.r; b.vx = b.vx.abs() * .86; }
       if (b.x > _size.width - b.r) { b.x = _size.width - b.r; b.vx = -b.vx.abs() * .86; }
-      if (b.y < b.r) { b.y = b.r; b.vy = b.vy.abs() * .82; }
-      // Recycle bubbles only after they have completely left the viewport.
-      if (b.y - b.r > _size.height) {
+      // Bubbles rise out through the top and respawn below the screen.
+      // Bouncing them off the top trapped them at the ceiling and stopped
+      // the intended continuous underwater flow.
+      if (b.y + b.r < 0) {
         _bubbles[index] = _createBubble(y: _size.height + b.r);
         continue;
       }
@@ -685,6 +686,8 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
   }
 
   void _pointer(Offset local) => _finger = local;
+
+  void _releasePointer() => _finger = null;
 
   void _popAt(Offset point) {
     var best = -1;
@@ -763,8 +766,13 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
       behavior: HitTestBehavior.translucent,
       onPanStart: (details) => _pointer(details.localPosition),
       onPanUpdate: (details) => _pointer(details.localPosition),
-      onPanEnd: (_) => _finger = null,
-      onTapDown: (details) => _popAt(details.localPosition),
+      onPanEnd: (_) => _releasePointer(),
+      onTapDown: (details) {
+        _pointer(details.localPosition);
+        _popAt(details.localPosition);
+      },
+      onTapUp: (_) => _releasePointer(),
+      onTapCancel: _releasePointer,
       child: RepaintBoundary(child: CustomPaint(
         painter: _BubblePainter(_bubbles, _ripples, _ticker),
         size: Size.infinite,
