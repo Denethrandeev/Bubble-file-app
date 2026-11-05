@@ -307,8 +307,9 @@ class _AquaAppState extends State<AquaApp> {
   Future<void> _loadDirectory(Directory directory) async {
     if (!_hasStorage && !await Permission.manageExternalStorage.isGranted) return;
     try {
-      // Keep the directory read simple; the visible list applies the selected
+      // Read directory entries once; the visible list applies the selected
       // sort once when the Files view is built (avoids sorting twice).
+      final entries = await directory.list(followLinks: false).toList();
       if (!mounted) return;
       setState(() {
         _current = directory;
