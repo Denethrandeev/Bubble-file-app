@@ -458,6 +458,12 @@ class _AquaAppState extends State<AquaApp> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(value)));
   }
 
+  @override
+  void dispose() {
+    _recycleTimer?.cancel();
+    super.dispose();
+  }
+
   void _openEntity(FileSystemEntity entity) {
     if (entity is Directory) {
       _loadDirectory(entity);
@@ -1079,7 +1085,6 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
   @override
   void dispose() {
     _sensor?.cancel();
-    _recycleTimer?.cancel();
     _ticker.dispose();
     _audio.dispose();
     super.dispose();
