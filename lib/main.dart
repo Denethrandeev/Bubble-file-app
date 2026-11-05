@@ -14,6 +14,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/services.dart';
+import 'package:open_filex/open_filex.dart';
 
 void main() => runApp(const AquaApp());
 
@@ -40,6 +42,8 @@ class _AquaAppState extends State<AquaApp> {
   bool _light = false;
   bool _checkingPermission = false;
   bool _hasStorage = false;
+  int _storageTotalBytes = 0;
+  int _storageFreeBytes = 0;
   String _storageMessage = 'Allow access to browse your phone storage.';
   Directory _root = Directory('/storage/emulated/0');
   Directory _current = Directory('/storage/emulated/0');
@@ -92,6 +96,7 @@ class _AquaAppState extends State<AquaApp> {
             : 'Android requires All files access. The system may open a Settings page; enable “Allow access to manage all files”, return to Aqua, then tap Check permission.';
       });
       if (status.isGranted) {
+        await _loadStorageInfo();
         await _discoverStorageRoots();
         await _loadDirectory(_root);
       }
@@ -102,6 +107,33 @@ class _AquaAppState extends State<AquaApp> {
         _storageMessage = 'Could not request storage access: ' + e.toString();
       });
     }
+  }
+
+  Future<void> _loadStorageInfo() async {
+    try {
+      final info = await const MethodChannel('aqua/storage')
+          .invokeMapMethod<String, int>('storageInfo');
+      if (!mounted || info == null) return;
+      setState(() {
+        _storageTotalBytes = info['total'] ?? 0;
+        _storageFreeBytes = info['free'] ?? 0;
+      });
+    } catch (_) {
+      // Keep the storage card usable even if a device blocks the native stat call.
+    }
+  }
+
+  double get _storageUsedFraction {
+    if (_storageTotalBytes <= 0) return 0;
+    return ((_storageTotalBytes - _storageFreeBytes) / _storageTotalBytes)
+        .clamp(0.0, 1.0);
+  }
+
+  Color get _storageStatusColor {
+    final used = _storageUsedFraction;
+    if (used >= .90) return const Color(0xFFFF5268);
+    if (used >= .70) return const Color(0xFFFFC15A);
+    return const Color(0xFF35D6B0);
   }
 
   Future<void> _initializeRecycleBin() async {
@@ -573,14 +605,14 @@ class _AquaAppState extends State<AquaApp> {
 
 
   Future<bool> _unlockFolderIfNeeded(Directory directory) async {
-    final key = 'aqua_folder_pin_\${sha256.convert(utf8.encode(directory.path))}';
+    final key = 'aqua_folder_pin_${sha256.convert(utf8.encode(directory.path))}';
     final stored = await _folderPinStore.read(key: key);
     if (stored == null) return true;
     final controller = TextEditingController();
     final pin = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Unlock \${_nameOf(directory)}'),
+        title: Text('Unlock ${_nameOf(directory)}'),
         content: TextField(controller: controller, obscureText: true,
           keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Folder PIN')),
         actions: [
@@ -590,20 +622,20 @@ class _AquaAppState extends State<AquaApp> {
       ),
     );
     if (pin == null) return false;
-    final digest = sha256.convert(utf8.encode('\${directory.path}:$pin')).toString();
+    final digest = sha256.convert(utf8.encode('${directory.path}:$pin')).toString();
     if (digest != stored) { _message('Incorrect folder PIN.'); return false; }
     return true;
   }
 
   Future<void> _setFolderPin(Directory directory) async {
-    final key = 'aqua_folder_pin_\${sha256.convert(utf8.encode(directory.path))}';
+    final key = 'aqua_folder_pin_${sha256.convert(utf8.encode(directory.path))}';
     final stored = await _folderPinStore.read(key: key);
     if (stored != null) {
       final controller = TextEditingController();
       final pin = await showDialog<String>(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text('Remove PIN • \${_nameOf(directory)}'),
+          title: Text('Remove PIN • ${_nameOf(directory)}'),
           content: TextField(controller: controller, obscureText: true, keyboardType: TextInputType.number,
             decoration: const InputDecoration(labelText: 'Current PIN')),
           actions: [
@@ -613,7 +645,7 @@ class _AquaAppState extends State<AquaApp> {
         ),
       );
       if (pin == null) return;
-      if (sha256.convert(utf8.encode('\${directory.path}:$pin')).toString() != stored) {
+      if (sha256.convert(utf8.encode('${directory.path}:$pin')).toString() != stored) {
         _message('Incorrect folder PIN.'); return;
       }
       await _folderPinStore.delete(key: key);
@@ -625,7 +657,7 @@ class _AquaAppState extends State<AquaApp> {
     final pin = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Protect \${_nameOf(directory)}'),
+        title: Text('Protect ${_nameOf(directory)}'),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           TextField(controller: first, obscureText: true, keyboardType: TextInputType.number,
             decoration: const InputDecoration(labelText: 'Create PIN (6+ digits)')),
@@ -643,15 +675,32 @@ class _AquaAppState extends State<AquaApp> {
       _message('PINs must match and contain at least 6 characters.'); return;
     }
     await _folderPinStore.write(key: key,
-      value: sha256.convert(utf8.encode('\${directory.path}:$pin')).toString());
+      value: sha256.convert(utf8.encode('${directory.path}:$pin')).toString());
     _message('Folder PIN protection enabled.');
   }
 
   Future<void> _openEntity(FileSystemEntity entity) async {
     if (entity is Directory) {
       if (await _unlockFolderIfNeeded(entity)) await _loadDirectory(entity);
-    } else {
+      return;
+    }
+    final ext = _extensionOf(entity);
+    final media = <String>{'mp3','wav','m4a','aac','flac','ogg','opus','wma','mp4','mkv','mov','webm','3gp','avi','m4v'};
+    try {
+      final result = await OpenFilex.open(entity.path);
+      if (result.type != ResultType.done) {
+        _message(result.message.isNotEmpty
+            ? result.message
+            : 'No installed app can open this file type.');
+        await _showDetails(entity);
+      }
+    } catch (e) {
+      _message('Could not open file: $e');
       await _showDetails(entity);
+    }
+    if (media.contains(ext)) {
+      // Audio/video are handed to the Android media app selected by the user.
+      // Document formats are likewise opened by a compatible installed viewer.
     }
   }
 
@@ -724,15 +773,32 @@ class _AquaAppState extends State<AquaApp> {
       Text('beautifully organized.', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: foreground)),
       const SizedBox(height: 20),
       _glass(child: Row(children: [
-        Container(width: 46, height: 46, decoration: BoxDecoration(
-          color: _accent.withOpacity(.15), borderRadius: BorderRadius.circular(15)),
-          child: Icon(Icons.sd_storage_rounded, color: _accent, size: 25)),
-        const SizedBox(width: 13),
+        CustomPaint(
+          size: const Size(58, 70),
+          painter: _StorageDropPainter(
+            fraction: _storageUsedFraction,
+            color: _storageStatusColor,
+            active: _hasStorage && _storageTotalBytes > 0,
+          ),
+        ),
+        const SizedBox(width: 14),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('PHONE STORAGE', style: TextStyle(fontSize: 10, letterSpacing: 1.6, color: Colors.white60)),
-          Text(_hasStorage ? 'Access enabled' : 'Permission required',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-          const Text('Internal storage browser', style: TextStyle(fontSize: 11, color: Colors.white54)),
+          Text(_hasStorage
+              ? (_storageTotalBytes > 0
+                  ? '${(_storageUsedFraction * 100).round()}% used'
+                  : 'Access enabled')
+              : 'Permission required',
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+          Text(_storageTotalBytes > 0
+              ? '${_formatBytes(_storageTotalBytes - _storageFreeBytes)} used • ${_formatBytes(_storageTotalBytes)} total'
+              : 'Internal storage browser',
+            style: const TextStyle(fontSize: 10, color: Colors.white54)),
+          const SizedBox(height: 5),
+          Text(_storageUsedFraction >= .90
+              ? 'Storage almost full'
+              : _storageUsedFraction >= .70 ? 'Storage filling up' : 'Storage available',
+            style: TextStyle(fontSize: 11, color: _storageStatusColor, fontWeight: FontWeight.w700)),
         ])),
         Icon(_hasStorage ? Icons.check_circle_rounded : Icons.lock_outline_rounded, color: _accent),
       ])),
