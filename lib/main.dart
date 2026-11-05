@@ -791,7 +791,7 @@ class _AquaAppState extends State<AquaApp> {
   );
 
   Widget _files(Color foreground) {
-    final visibleItems = visibleItems;
+    final visibleItems = _visibleItems;
     return Column(children: [
       Padding(
         padding: const EdgeInsets.fromLTRB(19, 8, 19, 10),
