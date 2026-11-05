@@ -103,6 +103,7 @@ jobs:
           import android.os.Build
           import android.os.Environment
           import android.os.StatFs
+          import android.os.storage.StorageManager
           import io.flutter.embedding.android.FlutterFragmentActivity
           import io.flutter.embedding.engine.FlutterEngine
           import io.flutter.plugin.common.MethodChannel
@@ -119,25 +120,51 @@ jobs:
                                       result.success(mapOf("total" to stats.totalBytes, "free" to stats.availableBytes))
                                   }}
                                   "storageVolumes" -> {{
-                                      val storageVolumes = getExternalFilesDirs(null).filterNotNull().mapNotNull {{ directory ->
-                                          val rawPath = directory.absolutePath
-                                          val marker = "/Android/data/"
-                                          val root = if (rawPath.contains(marker)) rawPath.substringBefore(marker) else rawPath
-                                          val state = Environment.getExternalStorageState(directory)
-                                          if (state != Environment.MEDIA_MOUNTED && state != Environment.MEDIA_MOUNTED_READ_ONLY) {{
-                                              null
-                                          }} else {{
-                                              try {{
-                                                  val stats = StatFs(root)
-                                                  mapOf(
-                                                      "path" to root,
-                                                      "removable" to Environment.isExternalStorageRemovable(directory),
-                                                      "state" to state,
-                                                      "total" to stats.totalBytes,
-                                                      "free" to stats.availableBytes
-                                                  )
-                                              }} catch (_: Exception) {{
+                                      val storageManager = getSystemService(STORAGE_SERVICE) as StorageManager
+                                      val storageVolumes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {{
+                                          storageManager.storageVolumes.mapNotNull {{ volume ->
+                                              val directory = volume.directory
+                                              val state = volume.state
+                                              if (directory == null ||
+                                                  (state != Environment.MEDIA_MOUNTED &&
+                                                   state != Environment.MEDIA_MOUNTED_READ_ONLY)) {{
                                                   null
+                                              }} else {{
+                                                  try {{
+                                                      val stats = StatFs(directory.absolutePath)
+                                                      mapOf(
+                                                          "path" to directory.absolutePath,
+                                                          "removable" to volume.isRemovable,
+                                                          "state" to state,
+                                                          "total" to stats.totalBytes,
+                                                          "free" to stats.availableBytes
+                                                      )
+                                                  }} catch (_: Exception) {{
+                                                      null
+                                                  }}
+                                              }}
+                                          }}
+                                      }} else {{
+                                          getExternalFilesDirs(null).filterNotNull().mapNotNull {{ directory ->
+                                              val rawPath = directory.absolutePath
+                                              val marker = "/Android/data/"
+                                              val root = if (rawPath.contains(marker)) rawPath.substringBefore(marker) else rawPath
+                                              val state = Environment.getExternalStorageState(directory)
+                                              if (state != Environment.MEDIA_MOUNTED && state != Environment.MEDIA_MOUNTED_READ_ONLY) {{
+                                                  null
+                                              }} else {{
+                                                  try {{
+                                                      val stats = StatFs(root)
+                                                      mapOf(
+                                                          "path" to root,
+                                                          "removable" to Environment.isExternalStorageRemovable(directory),
+                                                          "state" to state,
+                                                          "total" to stats.totalBytes,
+                                                          "free" to stats.availableBytes
+                                                      )
+                                                  }} catch (_: Exception) {{
+                                                      null
+                                                  }}
                                               }}
                                           }}
                                       }}.distinctBy {{ it["path"] }}
