@@ -419,7 +419,7 @@ class _AquaAppState extends State<AquaApp> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('${group.length} identical copies • ${_formatBytes(await _safeLength(group.first))}',
+                        Text('${group.length} identical copies',
                           style: const TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 5),
                         ...group.map((file) => Text(file.path,
@@ -437,10 +437,6 @@ class _AquaAppState extends State<AquaApp> {
     } finally {
       if (mounted) setState(() => _scanningDuplicates = false);
     }
-  }
-
-  Future<int> _safeLength(File file) async {
-    try { return await file.length(); } catch (_) { return 0; }
   }
 
   Future<void> _createFolder() async {
