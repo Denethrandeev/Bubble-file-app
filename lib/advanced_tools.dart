@@ -72,7 +72,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
   }
 
   String _normaliseRecoveryAnswer(String value) =>
-      value.trim().toLowerCase().replaceAll(RegExp(r'\\s+'), ' ');
+      value.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
 
   Future<String> _saltedDigest(String value) async {
     final random = math.Random.secure();
