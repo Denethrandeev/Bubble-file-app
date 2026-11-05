@@ -122,9 +122,14 @@ class _AquaAppState extends State<AquaApp> {
 
   Color get _accent => aquaAccents[_theme];
 
+  bool _showSplash = true;
+
   @override
   void initState() {
     super.initState();
+    Future<void>.delayed(const Duration(milliseconds: 3200), () {
+      if (mounted) setState(() => _showSplash = false);
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _requestStorage();
       _initializeRecycleBin();
@@ -882,7 +887,9 @@ class _AquaAppState extends State<AquaApp> {
         colorScheme: ColorScheme.fromSeed(seedColor: _accent,
           brightness: _light ? Brightness.light : Brightness.dark),
       ),
-      home: Scaffold(
+      home: _showSplash
+          ? const BubbleSplashScreen()
+          : Scaffold(
         body: Stack(children: [
           Positioned.fill(child: AquaBackdrop(reduced: _performance)),
           if (_animations)
@@ -919,7 +926,7 @@ class _AquaAppState extends State<AquaApp> {
         child: const Icon(Icons.water_drop_rounded, color: Color(0xFF06202A))),
       const SizedBox(width: 12),
       Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('AQUA', style: TextStyle(color: foreground, fontSize: 18,
+        Text('BUBBLE', style: TextStyle(color: foreground, fontSize: 18,
           fontWeight: FontWeight.w900, letterSpacing: 3)),
         Text('FILE MANAGER', style: TextStyle(color: foreground.withOpacity(.55),
           fontSize: 9, letterSpacing: 2.4)),
@@ -1227,7 +1234,7 @@ class _AquaAppState extends State<AquaApp> {
       ])),
       const SizedBox(height: 12),
       _glass(child: const Text(
-        'Aqua File Manager • Development build\n'
+        'Bubble File Manager • Development build\n'
         'Includes storage browsing, file operations, bubble physics, two-stage Recycle Bin, hidden files and SHA-256 duplicate scanning. '
         'Advanced Tools add encrypted Vault, ZIP, selected-photo GPS maps, removable-storage file import and cleanup suggestions. '
         'Automatic face similarity albums still require a bundled offline embedding model and validation on real devices.',
@@ -1310,6 +1317,171 @@ class _AquaAppState extends State<AquaApp> {
           color: _tab == index ? _accent : Colors.white54, fontWeight: FontWeight.w600)),
       ])),
   );
+}
+
+class BubbleSplashScreen extends StatefulWidget {
+  const BubbleSplashScreen({super.key});
+
+  @override
+  State<BubbleSplashScreen> createState() => _BubbleSplashScreenState();
+}
+
+class _BubbleSplashScreenState extends State<BubbleSplashScreen>
+    with TickerProviderStateMixin {
+  late final AnimationController _motion = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 7),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _motion.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF041C25),
+      body: AnimatedBuilder(
+        animation: _motion,
+        builder: (context, child) {
+          final t = _motion.value * math.pi * 2;
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment(0, -.12),
+                    radius: 1.15,
+                    colors: [Color(0xFF0B4650), Color(0xFF062A34), Color(0xFF03151E)],
+                  ),
+                ),
+              ),
+              for (var i = 0; i < 9; i++)
+                Positioned(
+                  left: (i * 47.0 + 18) % MediaQuery.sizeOf(context).width,
+                  top: (MediaQuery.sizeOf(context).height *
+                          ((i / 9 + _motion.value * (i.isEven ? 1 : -1)) % 1))
+                      .clamp(0.0, MediaQuery.sizeOf(context).height),
+                  child: Transform.translate(
+                    offset: Offset(math.sin(t + i) * 13, 0),
+                    child: Container(
+                      width: 9 + (i % 4) * 7,
+                      height: 9 + (i % 4) * 7,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF9CFFF4).withOpacity(.10 + (i % 3) * .035),
+                        border: Border.all(color: const Color(0xFF9CFFF4).withOpacity(.34)),
+                        boxShadow: [BoxShadow(color: const Color(0xFF54F5E7).withOpacity(.15), blurRadius: 12)],
+                      ),
+                    ),
+                  ),
+                ),
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Transform.translate(
+                      offset: Offset(0, math.sin(t) * 7),
+                      child: Transform.scale(
+                        scale: 1 + math.sin(t * .5) * .025,
+                        child: SizedBox(
+                          width: 230,
+                          height: 205,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Container(
+                                width: 196,
+                                height: 145,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(28),
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      const Color(0xFFB9FFF5).withOpacity(.46),
+                                      const Color(0xFF4DDDD5).withOpacity(.16),
+                                      const Color(0xFFB9FFF5).withOpacity(.30),
+                                    ],
+                                  ),
+                                  border: Border.all(color: const Color(0xFF8DFFF4), width: 3),
+                                  boxShadow: [
+                                    BoxShadow(color: const Color(0xFF36F5E6).withOpacity(.34), blurRadius: 35, spreadRadius: 3),
+                                    BoxShadow(color: Colors.white.withOpacity(.10), blurRadius: 9, spreadRadius: -2),
+                                  ],
+                                ),
+                                child: Icon(Icons.folder_rounded, size: 112,
+                                  color: const Color(0xFFD6FFFA).withOpacity(.82)),
+                              ),
+                              for (var i = 0; i < 6; i++)
+                                Positioned(
+                                  left: 18 + (i * 31.0) % 190,
+                                  top: 10 + ((i * 43.0 + t * 12) % 170),
+                                  child: Container(
+                                    width: 10 + (i % 3) * 8,
+                                    height: 10 + (i % 3) * 8,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: RadialGradient(colors: [
+                                        Colors.white.withOpacity(.95),
+                                        const Color(0xFF7CFFF2).withOpacity(.20),
+                                      ]),
+                                      border: Border.all(color: Colors.white.withOpacity(.65)),
+                                      boxShadow: [BoxShadow(color: const Color(0xFF70FFF2).withOpacity(.4), blurRadius: 10)],
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 23),
+                    const Text('BUBBLE',
+                      style: TextStyle(fontSize: 43, fontWeight: FontWeight.w900,
+                        letterSpacing: 3.5, color: Color(0xFF9CFFF0),
+                        shadows: [Shadow(color: Color(0xFF36DCCF), blurRadius: 22)])),
+                    const SizedBox(height: 2),
+                    const Text('FILE MANAGER',
+                      style: TextStyle(fontSize: 19, letterSpacing: 4.0,
+                        fontWeight: FontWeight.w300, color: Color(0xFFE3FFFC))),
+                    const SizedBox(height: 22),
+                    Text('Safety and Relax File Management System',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 10, letterSpacing: .6,
+                        color: Colors.white.withOpacity(.72))),
+                    const SizedBox(height: 7),
+                    Text('Created by H.G.Aluthge',
+                      style: TextStyle(fontSize: 10, letterSpacing: 1.1,
+                        color: Colors.white.withOpacity(.52))),
+                  ],
+                ),
+              ),
+              Positioned(
+                bottom: 35,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: SizedBox(
+                    width: 28, height: 2,
+                    child: LinearProgressIndicator(
+                      value: null,
+                      backgroundColor: Colors.white.withOpacity(.10),
+                      color: const Color(0xFF8DFFF4),
+                      minHeight: 2,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 }
 
 class AquaBackdrop extends StatelessWidget {
