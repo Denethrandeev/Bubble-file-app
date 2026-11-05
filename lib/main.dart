@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
+import 'advanced_tools.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
@@ -439,6 +440,13 @@ class _AquaAppState extends State<AquaApp> {
     }
   }
 
+  Future<void> _openAdvancedTools() async {
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => AquaAdvancedTools(targetDirectory: _current, accent: _accent),
+    ));
+    if (_hasStorage) await _loadDirectory(_current);
+  }
+
   Future<void> _createFolder() async {
     final controller = TextEditingController();
     final name = await showDialog<String>(
@@ -649,6 +657,17 @@ class _AquaAppState extends State<AquaApp> {
           _category('Downloads', Icons.download_rounded),
         ],
       ),
+      const SizedBox(height: 14),
+      InkWell(onTap: _openAdvancedTools, borderRadius: BorderRadius.circular(22),
+        child: _glass(child: Row(children: [
+          Icon(Icons.auto_awesome_rounded, color: _accent, size: 27),
+          const SizedBox(width: 12),
+          const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Advanced tools', style: TextStyle(fontWeight: FontWeight.w800)),
+            Text('Vault • ZIP • GPS maps • Smart Cleanup • SD / USB', style: TextStyle(fontSize: 10, color: Colors.white60)),
+          ])),
+          const Icon(Icons.chevron_right_rounded, color: Colors.white54),
+        ]))),
       const SizedBox(height: 17),
       _glass(child: Row(children: [
         Icon(Icons.bubble_chart_rounded, color: _accent, size: 28),
@@ -868,8 +887,9 @@ class _AquaAppState extends State<AquaApp> {
       const SizedBox(height: 12),
       _glass(child: const Text(
         'Aqua File Manager • Development build\n'
-        'This version includes storage browsing, folder creation and rename, live bubble physics, tilt response, touch attraction and pop sound. '
-        'Vault encryption, recycle-bin timers, face grouping, location maps, duplicate scanning and media tools still need separate implementation and testing.',
+        'Includes storage browsing, file operations, bubble physics, two-stage Recycle Bin, hidden files and SHA-256 duplicate scanning. '
+        'Advanced Tools add encrypted Vault, ZIP, selected-photo GPS maps, removable-storage file import and cleanup suggestions. '
+        'Automatic face similarity albums still require a bundled offline embedding model and validation on real devices.',
         style: TextStyle(fontSize: 11, color: Colors.white60, height: 1.55))),
     ],
   );
