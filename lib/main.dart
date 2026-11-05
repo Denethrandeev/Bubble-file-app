@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
@@ -6,6 +7,7 @@ import 'dart:ui' as ui;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 
@@ -42,13 +44,22 @@ class _AquaAppState extends State<AquaApp> {
   bool _foldersFirst = true;
   String _fileCategory = 'All files';
   String _sortMode = 'Name';
+  Directory? _recycleDirectory;
+  File? _recycleIndex;
+  List<Map<String, dynamic>> _recycleRecords = <Map<String, dynamic>>[];
+  FileSystemEntity? _clipboardEntity;
+  bool _clipboardMove = false;
+  Timer? _recycleTimer;
 
   Color get _accent => aquaAccents[_theme];
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _requestStorage());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _requestStorage();
+      _initializeRecycleBin();
+    });
   }
 
   Future<void> _requestStorage() async {
@@ -82,6 +93,185 @@ class _AquaAppState extends State<AquaApp> {
         _storageMessage = 'Could not request storage access: ' + e.toString();
       });
     }
+  }
+
+  Future<void> _initializeRecycleBin() async {
+    try {
+      final support = await getApplicationSupportDirectory();
+      final folder = Directory('${support.path}/aqua_recycle_bin');
+      await folder.create(recursive: true);
+      final index = File('${support.path}/aqua_recycle_bin.json');
+      var records = <Map<String, dynamic>>[];
+      if (await index.exists()) {
+        final decoded = jsonDecode(await index.readAsString());
+        if (decoded is List) {
+          records = decoded.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _recycleDirectory = folder;
+        _recycleIndex = index;
+        _recycleRecords = records;
+      });
+      await _expireRecycleRecords();
+      _recycleTimer?.cancel();
+      _recycleTimer = Timer.periodic(const Duration(minutes: 1), (_) => _expireRecycleRecords());
+    } catch (e) {
+      _message('Recycle Bin could not be initialized: ' + e.toString());
+    }
+  }
+
+  Future<void> _saveRecycleRecords() async {
+    final index = _recycleIndex;
+    if (index == null) return;
+    await index.writeAsString(jsonEncode(_recycleRecords), flush: true);
+  }
+
+  Future<void> _deleteEntityPermanently(String path) async {
+    final type = await FileSystemEntity.type(path, followLinks: false);
+    if (type == FileSystemEntityType.directory) {
+      await Directory(path).delete(recursive: true);
+    } else if (type != FileSystemEntityType.notFound) {
+      await File(path).delete();
+    }
+  }
+
+  Future<void> _expireRecycleRecords() async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final keep = <Map<String, dynamic>>[];
+    for (final record in _recycleRecords) {
+      final stage = record['stage'] as String? ?? 'bin';
+      final started = (record['stageStartedAt'] as num?)?.toInt() ?? now;
+      final lifetime = stage == 'shred' ? const Duration(hours: 2).inMilliseconds : const Duration(days: 30).inMilliseconds;
+      if (now - started >= lifetime) {
+        try { await _deleteEntityPermanently(record['storedPath'] as String); } catch (_) {}
+      } else {
+        keep.add(record);
+      }
+    }
+    if (keep.length != _recycleRecords.length) {
+      if (mounted) setState(() => _recycleRecords = keep);
+      else _recycleRecords = keep;
+      await _saveRecycleRecords();
+    }
+  }
+
+  Future<void> _copyEntityRecursively(FileSystemEntity source, String targetPath) async {
+    if (source is File) {
+      await source.copy(targetPath);
+      return;
+    }
+    if (source is Directory) {
+      final target = Directory(targetPath);
+      await target.create(recursive: true);
+      await for (final child in source.list(followLinks: false)) {
+        final childName = _nameOf(child);
+        await _copyEntityRecursively(child, '${target.path}/$childName');
+      }
+      return;
+    }
+    throw FileSystemException('Unsupported file-system item', source.path);
+  }
+
+  Future<void> _moveEntityToClipboard(FileSystemEntity entity, {required bool move}) async {
+    setState(() {
+      _clipboardEntity = entity;
+      _clipboardMove = move;
+    });
+    _message(move ? 'Cut: ${_nameOf(entity)}' : 'Copied: ${_nameOf(entity)}');
+  }
+
+  Future<void> _pasteClipboard() async {
+    final source = _clipboardEntity;
+    if (source == null) return;
+    final target = '${_current.path}/${_nameOf(source)}';
+    if (source.path == target) {
+      _message('This item is already in the current folder.');
+      return;
+    }
+    try {
+      await _copyEntityRecursively(source, target);
+      if (_clipboardMove) await _deleteEntityPermanently(source.path);
+      if (mounted) setState(() { _clipboardEntity = null; _clipboardMove = false; });
+      await _loadDirectory(_current);
+      _message(_clipboardMove ? 'Moved successfully.' : 'Copied successfully.');
+    } catch (e) {
+      _message('Copy or move failed: ' + e.toString());
+    }
+  }
+
+  Future<void> _sendToRecycleBin(FileSystemEntity entity) async {
+    final folder = _recycleDirectory;
+    if (folder == null) {
+      _message('Recycle Bin is not ready yet.');
+      return;
+    }
+    try {
+      final id = DateTime.now().microsecondsSinceEpoch.toString();
+      final storedPath = '${folder.path}/${id}_${_nameOf(entity)}';
+      await _copyEntityRecursively(entity, storedPath);
+      await _deleteEntityPermanently(entity.path);
+      final now = DateTime.now().millisecondsSinceEpoch;
+      setState(() => _recycleRecords.add({
+        'id': id, 'name': _nameOf(entity), 'originalPath': entity.path,
+        'storedPath': storedPath, 'stage': 'bin', 'stageStartedAt': now,
+      }));
+      await _saveRecycleRecords();
+      await _loadDirectory(_current);
+      _message('Moved to Recycle Bin for 30 days.');
+    } catch (e) {
+      _message('Could not move item to Recycle Bin: ' + e.toString());
+    }
+  }
+
+  Future<void> _restoreRecycleRecord(Map<String, dynamic> record) async {
+    try {
+      var destination = record['originalPath'] as String;
+      final parent = Directory(File(destination).parent.path);
+      await parent.create(recursive: true);
+      if (await FileSystemEntity.type(destination) != FileSystemEntityType.notFound) {
+        final base = destination;
+        var suffix = 1;
+        do {
+          destination = '$base (restored $suffix)';
+          suffix++;
+        } while (await FileSystemEntity.type(destination) != FileSystemEntityType.notFound);
+      }
+      final sourcePath = record['storedPath'] as String;
+      final type = await FileSystemEntity.type(sourcePath, followLinks: false);
+      if (type == FileSystemEntityType.directory) {
+        await _copyEntityRecursively(Directory(sourcePath), destination);
+      } else {
+        await File(sourcePath).copy(destination);
+      }
+      await _deleteEntityPermanently(sourcePath);
+      setState(() => _recycleRecords.removeWhere((item) => item['id'] == record['id']));
+      await _saveRecycleRecords();
+      _message('File restored.');
+      if (_hasStorage) await _loadDirectory(_current);
+    } catch (e) {
+      _message('Restore failed: ' + e.toString());
+    }
+  }
+
+  Future<void> _deleteAgainForTwoHours(Map<String, dynamic> record) async {
+    setState(() {
+      record['stage'] = 'shred';
+      record['stageStartedAt'] = DateTime.now().millisecondsSinceEpoch;
+    });
+    await _saveRecycleRecords();
+    _message('Moved to 2-hour temporary recovery stage.');
+  }
+
+  String _remainingTime(Map<String, dynamic> record) {
+    final started = (record['stageStartedAt'] as num?)?.toInt() ?? 0;
+    final stage = record['stage'] as String? ?? 'bin';
+    final duration = stage == 'shred' ? const Duration(hours: 2) : const Duration(days: 30);
+    final remaining = duration - DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(started));
+    if (remaining.isNegative) return 'Expiring…';
+    if (stage == 'shred') return '${remaining.inHours}h ${remaining.inMinutes.remainder(60)}m left';
+    return '${remaining.inDays}d ${remaining.inHours.remainder(24)}h left';
   }
 
   Future<void> _loadDirectory(Directory directory) async {
@@ -291,6 +481,7 @@ class _AquaAppState extends State<AquaApp> {
               _home(foreground),
               _files(foreground),
               _settings(foreground),
+              _recycleBin(foreground),
             ])),
             _bottomNav(foreground),
           ])),
@@ -392,8 +583,10 @@ class _AquaAppState extends State<AquaApp> {
         child: Row(children: [
           Expanded(child: Text(_fileCategory, style: TextStyle(fontSize: 27,
             fontWeight: FontWeight.w800, color: foreground))),
-          IconButton(onPressed: _createFolder, icon: Icon(Icons.create_new_folder_rounded, color: _accent)),
-          IconButton(onPressed: () => _loadDirectory(_root), icon: Icon(Icons.home_rounded, color: _accent)),
+          if (_clipboardEntity != null)
+            IconButton(onPressed: _pasteClipboard, tooltip: 'Paste', icon: Icon(Icons.content_paste_rounded, color: _accent)),
+          IconButton(onPressed: _createFolder, tooltip: 'New folder', icon: Icon(Icons.create_new_folder_rounded, color: _accent)),
+          IconButton(onPressed: () => _loadDirectory(_root), tooltip: 'Home folder', icon: Icon(Icons.home_rounded, color: _accent)),
         ]),
       ),
       if (!_hasStorage)
@@ -481,9 +674,15 @@ class _AquaAppState extends State<AquaApp> {
                       onSelected: (value) {
                         if (value == 'rename') _rename(item);
                         if (value == 'details') _showDetails(item);
+                        if (value == 'copy') _moveEntityToClipboard(item, move: false);
+                        if (value == 'cut') _moveEntityToClipboard(item, move: true);
+                        if (value == 'delete') _sendToRecycleBin(item);
                       },
                       itemBuilder: (context) => const [
+                        PopupMenuItem(value: 'copy', child: Text('Copy')),
+                        PopupMenuItem(value: 'cut', child: Text('Cut')),
                         PopupMenuItem(value: 'rename', child: Text('Rename')),
+                        PopupMenuItem(value: 'delete', child: Text('Move to Recycle Bin')),
                         PopupMenuItem(value: 'details', child: Text('Properties')),
                       ],
                     ),
@@ -493,6 +692,38 @@ class _AquaAppState extends State<AquaApp> {
             )),
       ],
     ]);
+  }
+
+  Widget _recycleBin(Color foreground) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(19, 10, 19, 22),
+      children: [
+        Text('Recycle Bin', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: foreground)),
+        const SizedBox(height: 8),
+        const Text('Items stay here for 30 days. Choosing Delete again starts a separate 2-hour recovery period.',
+          style: TextStyle(fontSize: 12, color: Colors.white60, height: 1.4)),
+        const SizedBox(height: 14),
+        if (_recycleRecords.isEmpty)
+          _glass(child: const Text('Recycle Bin is empty.', style: TextStyle(color: Colors.white70)))
+        else ..._recycleRecords.map((record) => Padding(
+          padding: const EdgeInsets.only(bottom: 9),
+          child: _glass(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(record['name'] as String? ?? 'File', maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 5),
+            Text((record['stage'] == 'shred' ? 'Temporary recovery • ' : 'Recycle Bin • ') + _remainingTime(record),
+              style: TextStyle(fontSize: 11, color: _accent)),
+            const SizedBox(height: 8),
+            Row(children: [
+              TextButton(onPressed: () => _restoreRecycleRecord(record), child: const Text('Restore')),
+              const Spacer(),
+              if (record['stage'] != 'shred')
+                TextButton(onPressed: () => _deleteAgainForTwoHours(record), child: const Text('Delete again')),
+            ]),
+          ])),
+        )),
+      ],
+    );
   }
 
   Widget _settings(Color foreground) => ListView(
@@ -581,6 +812,7 @@ class _AquaAppState extends State<AquaApp> {
             _navItem('Home', Icons.water_drop_rounded, 0),
             _navItem('Files', Icons.folder_rounded, 1),
             _navItem('Settings', Icons.settings_rounded, 2),
+            _navItem('Bin', Icons.delete_outline_rounded, 3),
           ]),
         ),
       ),
@@ -831,6 +1063,7 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
   @override
   void dispose() {
     _sensor?.cancel();
+    _recycleTimer?.cancel();
     _ticker.dispose();
     _audio.dispose();
     super.dispose();
