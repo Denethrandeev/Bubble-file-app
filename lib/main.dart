@@ -1985,7 +1985,7 @@ class _BubblePainter extends CustomPainter {
 }
 
 class _SecretBoxGesturePainter extends CustomPainter {
-  const _SecretBoxGesturePainter(this.points);
+  _SecretBoxGesturePainter(List<Offset> points) : points = List<Offset>.of(points);
   final List<Offset> points;
 
   @override
@@ -2011,7 +2011,6 @@ class _SecretBoxGesturePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _SecretBoxGesturePainter oldDelegate) =>
-      oldDelegate.points != points || oldDelegate.points.length != points.length;
+  bool shouldRepaint(covariant _SecretBoxGesturePainter oldDelegate) => true;
 }
 
