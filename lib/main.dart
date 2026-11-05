@@ -1851,7 +1851,7 @@ class _BubblePainter extends CustomPainter {
       canvas.drawCircle(Offset(drop.x, drop.y), drop.radius * drop.life,
         Paint()..color = color);
       canvas.drawCircle(Offset(drop.x, drop.y), drop.radius * drop.life,
-        Paint()..style = PaintingStyle.stroke..strokeWidth: .6
+        Paint()..style = PaintingStyle.stroke..strokeWidth = .6
           ..color = Colors.white.withOpacity(.55 * drop.life));
     }
     for (final b in bubbles) {
