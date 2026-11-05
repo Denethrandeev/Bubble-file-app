@@ -79,18 +79,25 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
           roots = [Path.home() / ".pub-cache/hosted/pub.dev", Path.home() / ".pub-cache/hosted"]
           changed = []
           for root in roots:
               if not root.exists():
                   continue
               for gradle in root.glob("file_picker-*/android/build.gradle"):
-                  data = gradle.read_text()
-                  updated, count = re.subn(r"(?m)^([ \\t]*compileSdkVersion[ \\t]+)\\d+", r"\\g<1>36", data)
-                  updated, count2 = re.subn(r"(?m)^([ \\t]*compileSdk[ \\t]*=[ \\t]*)\\d+", r"\\g<1>36", updated)
-                  if count + count2:
-                      gradle.write_text(updated)
+                  lines = gradle.read_text().splitlines()
+                  count = 0
+                  for i, line in enumerate(lines):
+                      stripped = line.strip()
+                      indent = line[:len(line) - len(line.lstrip())]
+                      if stripped.startswith("compileSdkVersion "):
+                          lines[i] = indent + "compileSdkVersion 36"
+                          count += 1
+                      elif stripped.startswith("compileSdk ="):
+                          lines[i] = indent + "compileSdk = 36"
+                          count += 1
+                  if count:
+                      gradle.write_text("\\n".join(lines) + "\\n")
                       changed.append(str(gradle))
           if not changed:
               raise SystemExit("Could not locate file_picker Android Gradle file to align compile SDK")
