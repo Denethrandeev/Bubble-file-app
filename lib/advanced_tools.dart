@@ -329,6 +329,15 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
     return decimal;
   }
 
+  Map<String, List<_GeoPhoto>> get _geoGroups {
+    final groups = <String, List<_GeoPhoto>>{};
+    for (final photo in _geoPhotos) {
+      final key = '${photo.latitude.toStringAsFixed(2)}, ${photo.longitude.toStringAsFixed(2)}';
+      (groups[key] ??= <_GeoPhoto>[]).add(photo);
+    }
+    return groups;
+  }
+
   Future<void> _openMap(_GeoPhoto photo) async {
     final uri = Uri.parse('https://www.openstreetmap.org/?mlat=${photo.latitude}&mlon=${photo.longitude}#map=16/${photo.latitude}/${photo.longitude}');
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) _say('Could not open the map application.');
@@ -394,11 +403,21 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
       if (_geoPhotos.isNotEmpty) ...[
         const SizedBox(height: 8),
         Text('Photo locations (${_geoPhotos.length})', style: const TextStyle(fontWeight: FontWeight.bold)),
-        ..._geoPhotos.map((photo) => ListTile(
-          leading: const Icon(Icons.photo, color: Colors.cyanAccent),
-          title: Text(photo.file.uri.pathSegments.last, maxLines: 1, overflow: TextOverflow.ellipsis),
-          subtitle: Text('${photo.latitude.toStringAsFixed(5)}, ${photo.longitude.toStringAsFixed(5)}'),
-          trailing: IconButton(icon: const Icon(Icons.map), onPressed: () => _openMap(photo)),
+        ..._geoGroups.entries.map((entry) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.place, color: Colors.cyanAccent),
+              title: Text('Location group • ${entry.value.length} photo(s)'),
+              subtitle: Text('Approx. ${entry.key}'),
+              trailing: IconButton(icon: const Icon(Icons.map), onPressed: () => _openMap(entry.value.first)),
+            ),
+            ...entry.value.map((photo) => Padding(
+              padding: const EdgeInsets.only(left: 52),
+              child: Text(photo.file.uri.pathSegments.last, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white70, fontSize: 12)),
+            )),
+          ],
         )),
       ],
       _toolCard('Smart Cleanup suggestions', 'Find large and older files; never delete automatically', Icons.cleaning_services, _smartCleanup),
