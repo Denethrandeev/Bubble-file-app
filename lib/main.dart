@@ -56,24 +56,23 @@ class _AquaAppState extends State<AquaApp> {
     }
     if (mounted) setState(() => _checkingPermission = true);
     try {
+      // Android 11+ uses a special All files access setting. A legacy
+      // media permission is NOT enough to browse the whole shared-storage tree.
       var status = await Permission.manageExternalStorage.status;
       if (!status.isGranted) {
         status = await Permission.manageExternalStorage.request();
-      }
-      if (!status.isGranted) {
-        var legacy = await Permission.storage.status;
-        if (!legacy.isGranted) legacy = await Permission.storage.request();
-        status = legacy;
       }
       if (!mounted) return;
       setState(() {
         _hasStorage = status.isGranted;
         _checkingPermission = false;
         _storageMessage = status.isGranted
-            ? 'Storage access is ready.'
-            : 'Storage access is not enabled. Use the button below to try again or enable All files access in Android Settings.';
+            ? 'All files access is enabled.'
+            : 'Android requires All files access. The system may open a Settings page; enable “Allow access to manage all files”, return to Aqua, then tap Check permission.';
       });
-      if (status.isGranted) await _loadDirectory(_root);
+      if (status.isGranted) {
+        await _loadDirectory(_root);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
