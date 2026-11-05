@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sensors_plus/sensors_plus.dart';
+import 'package:share_plus/share_plus.dart';
 
 void main() => runApp(const AquaApp());
 
@@ -411,6 +412,18 @@ class _AquaAppState extends State<AquaApp> {
     }
   }
 
+  Future<void> _shareEntity(FileSystemEntity entity) async {
+    if (entity is! File) {
+      _message('Sharing folders is not supported yet. Select an individual file.');
+      return;
+    }
+    try {
+      await Share.shareXFiles([XFile(entity.path)], text: _nameOf(entity));
+    } catch (e) {
+      _message('Could not share this file: ' + e.toString());
+    }
+  }
+
   Future<void> _showDetails(FileSystemEntity entity) async {
     var size = 'Folder';
     if (entity is File) {
@@ -678,12 +691,14 @@ class _AquaAppState extends State<AquaApp> {
                         if (value == 'copy') _moveEntityToClipboard(item, move: false);
                         if (value == 'cut') _moveEntityToClipboard(item, move: true);
                         if (value == 'delete') _sendToRecycleBin(item);
+                        if (value == 'share') _shareEntity(item);
                       },
                       itemBuilder: (context) => const [
                         PopupMenuItem(value: 'copy', child: Text('Copy')),
                         PopupMenuItem(value: 'cut', child: Text('Cut')),
                         PopupMenuItem(value: 'rename', child: Text('Rename')),
                         PopupMenuItem(value: 'delete', child: Text('Move to Recycle Bin')),
+                        PopupMenuItem(value: 'share', child: Text('Share')),
                         PopupMenuItem(value: 'details', child: Text('Properties')),
                       ],
                     ),
