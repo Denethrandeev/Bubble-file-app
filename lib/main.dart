@@ -307,23 +307,43 @@ class _AquaAppState extends State<AquaApp> {
     }
   }
 
+  bool _isExpiringRecycleRecords = false;
+
   Future<void> _expireRecycleRecords() async {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final keep = <Map<String, dynamic>>[];
-    for (final record in _recycleRecords) {
-      final stage = record['stage'] as String? ?? 'bin';
-      final started = (record['stageStartedAt'] as num?)?.toInt() ?? now;
-      final lifetime = stage == 'shred' ? const Duration(hours: 2).inMilliseconds : const Duration(days: 30).inMilliseconds;
-      if (now - started >= lifetime) {
-        try { await _deleteEntityPermanently(record['storedPath'] as String); } catch (_) {}
-      } else {
-        keep.add(record);
+    if (_isExpiringRecycleRecords) return;
+    _isExpiringRecycleRecords = true;
+    try {
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final keep = <Map<String, dynamic>>[];
+      var changed = false;
+      for (final record in List<Map<String, dynamic>>.from(_recycleRecords)) {
+        final stage = record['stage'] as String? ?? 'bin';
+        final started = (record['stageStartedAt'] as num?)?.toInt() ?? now;
+        final lifetime = stage == 'shred'
+            ? const Duration(hours: 2).inMilliseconds
+            : const Duration(days: 30).inMilliseconds;
+        if (now - started >= lifetime) {
+          try {
+            await _deleteEntityPermanently(record['storedPath'] as String);
+            changed = true;
+          } catch (_) {
+            // Keep recovery metadata so a failed deletion can be retried.
+            keep.add(record);
+          }
+        } else {
+          keep.add(record);
+        }
       }
-    }
-    if (keep.length != _recycleRecords.length) {
-      if (mounted) setState(() => _recycleRecords = keep);
-      else _recycleRecords = keep;
-      await _saveRecycleRecords();
+      if (changed || keep.length != _recycleRecords.length) {
+        if (mounted) {
+          setState(() => _recycleRecords = keep);
+        } else {
+          _recycleRecords = keep;
+        }
+        await _saveRecycleRecords();
+      }
+    } finally {
+      _isExpiringRecycleRecords = false;
     }
   }
 
