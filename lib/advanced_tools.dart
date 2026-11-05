@@ -9,6 +9,7 @@ import 'package:crypto/crypto.dart' as hashes;
 import 'package:exif/exif.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -53,6 +54,8 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
   List<File> _vaultFiles = <File>[];
   List<_GeoPhoto> _geoPhotos = <_GeoPhoto>[];
   List<File> _cleanupSuggestions = <File>[];
+  Map<String, dynamic>? _deviceDiagnostics;
+  String _performanceSummary = '';
 
   void _say(String value) {
     if (mounted) setState(() => _status = value);
@@ -502,6 +505,38 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
     _say('Imported $copied file(s) from the Android file picker. Choose SD card or USB storage in the system picker.');
   }
 
+  Future<void> _runDeviceDiagnostics() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    _say('Checking Android storage access, removable volumes and runtime performance…');
+    try {
+      final stopwatch = Stopwatch()..start();
+      var scannedEntries = 0;
+      try {
+        await for (final _ in widget.targetDirectory.list(followLinks: false).take(500)) {
+          scannedEntries++;
+        }
+      } catch (_) {}
+      stopwatch.stop();
+      final diagnostics = await const MethodChannel('aqua/storage')
+          .invokeMapMethod<String, dynamic>('deviceDiagnostics');
+      if (diagnostics == null) {
+        throw StateError('Android diagnostic channel returned no data. Rebuild the APK first.');
+      }
+      if (!mounted) return;
+      setState(() {
+        _deviceDiagnostics = diagnostics;
+        _performanceSummary =
+            'Current folder: $scannedEntries entries checked in ${stopwatch.elapsedMilliseconds} ms (maximum 500).';
+      });
+      _say('Device diagnostics completed. Physical USB/SD access still needs a real-device check.');
+    } catch (e) {
+      _say('Device diagnostics unavailable: $e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _scanGpsPhotos() async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -704,6 +739,25 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
       onTap: _busy ? null : action,
     ));
 
+  Widget _diagnosticRow(String label, String value) => ListTile(
+    dense: true,
+    title: Text(label, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+    subtitle: Text(value, style: const TextStyle(fontSize: 11)),
+  );
+
+  String _formatDiagnosticBytes(dynamic value) {
+    final bytes = value is num ? value.toInt() : 0;
+    if (bytes <= 0) return 'Unavailable';
+    const units = <String>['B', 'KB', 'MB', 'GB'];
+    var size = bytes.toDouble();
+    var index = 0;
+    while (size >= 1024 && index < units.length - 1) {
+      size /= 1024;
+      index++;
+    }
+    return '${size.toStringAsFixed(1)} ${units[index]}';
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFF071E2A),
@@ -745,6 +799,22 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
           subtitle: Text(file.path, maxLines: 1, overflow: TextOverflow.ellipsis),
           trailing: const Icon(Icons.info_outline),
         )),
+      ],
+      _toolCard('Android 11+ storage & performance diagnostics', 'Check All files access, mounted storage volumes, RAM and current-folder scan time', Icons.memory, _runDeviceDiagnostics),
+      if (_deviceDiagnostics != null) ...[
+        const SizedBox(height: 8),
+        _diagnosticRow('Android API', '${_deviceDiagnostics!['sdkInt'] ?? 'Unknown'}'),
+        _diagnosticRow('All files access', '${_deviceDiagnostics!['allFilesAccess'] ?? 'Unknown'}'),
+        _diagnosticRow('Total RAM', _formatDiagnosticBytes(_deviceDiagnostics!['totalRamBytes'])),
+        _diagnosticRow('Available RAM', _formatDiagnosticBytes(_deviceDiagnostics!['availableRamBytes'])),
+        _diagnosticRow('Mounted volumes', '${(_deviceDiagnostics!['volumes'] as List? ?? const []).length}'),
+        ...((_deviceDiagnostics!['volumes'] as List? ?? const []).whereType<Map>().map((volume) =>
+          _diagnosticRow(
+            '${volume['removable'] == true ? 'Removable' : 'Storage'} • ${volume['state'] ?? 'unknown'}',
+            '${volume['path'] ?? 'Path unavailable'}',
+          ))),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          child: Text(_performanceSummary, style: const TextStyle(color: Colors.white70, fontSize: 11))),
       ],
       _toolCard('Import from SD card / USB', 'Use Android system picker to select files from removable storage', Icons.usb, _importExternal),
       _toolCard('Face Similarity / Person Albums', 'Not enabled: requires a bundled offline face-embedding model and device testing', Icons.face, () {
