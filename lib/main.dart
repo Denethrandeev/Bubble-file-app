@@ -877,7 +877,7 @@ class _AquaAppState extends State<AquaApp> {
     }
     await _folderPinStore.write(key: key,
       value: sha256.convert(utf8.encode('${directory.path}:$pin')).toString());
-    _message('Folder PIN protection enabled.');
+    _message('In-app PIN gate enabled. This does not encrypt the folder or block access from other apps.');
   }
 
   Future<void> _openEntity(FileSystemEntity entity) async {
