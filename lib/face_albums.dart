@@ -36,6 +36,7 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
   int _processed = 0;
   int _skipped = 0;
   List<_PersonCluster> _groups = <_PersonCluster>[];
+  final List<({ _PersonCluster group, String path })> _undoRemovals = [];
 
   bool _isImage(String path) {
     final lower = path.toLowerCase();
@@ -248,12 +249,40 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
     }
   }
 
+  Future<void> _removeFromGroup(_PersonCluster group, String path, StateSetter sheetSetState) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Remove from this album?'),
+        content: const Text('This only removes the photo from this temporary face group. The original photo will stay on your phone and will not be deleted.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Remove')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted || !group.paths.contains(path)) return;
+    setState(() => _undoRemovals.add((group: group, path: path)));
+    sheetSetState(() => group.paths.remove(path));
+  }
+
+  void _undoLastRemoval() {
+    if (_undoRemovals.isEmpty) return;
+    final item = _undoRemovals.removeLast();
+    if (!item.group.paths.contains(item.path)) {
+      item.group.paths.add(item.path);
+      item.group.paths.sort();
+    }
+    setState(() {});
+  }
+
   void _showGroup(_PersonCluster group, int index) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: const Color(0xFF102B38),
-      builder: (sheetContext) => SafeArea(
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, sheetSetState) => SafeArea(
         child: SizedBox(
           height: MediaQuery.of(sheetContext).size.height * .78,
           child: Column(
@@ -285,19 +314,40 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
                   itemCount: group.paths.length,
                   itemBuilder: (context, i) {
                     final path = group.paths[i];
-                    return InkWell(
-                      onTap: () => OpenFilex.open(path),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.file(
-                          File(path),
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => const ColoredBox(
-                            color: Color(0xFF244653),
-                            child: Icon(Icons.broken_image_outlined),
+                    return Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        InkWell(
+                          onTap: () => OpenFilex.open(path),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Image.file(
+                              File(path),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const ColoredBox(
+                                color: Color(0xFF244653),
+                                child: Icon(Icons.broken_image_outlined),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                        Positioned(
+                          top: 2,
+                          right: 2,
+                          child: Material(
+                            color: Colors.black.withValues(alpha: .65),
+                            shape: const CircleBorder(),
+                            child: IconButton(
+                              tooltip: 'Remove from this album',
+                              visualDensity: VisualDensity.compact,
+                              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+                              padding: EdgeInsets.zero,
+                              icon: const Icon(Icons.close, size: 18, color: Colors.white),
+                              onPressed: () => _removeFromGroup(group, path, sheetSetState),
+                            ),
+                          ),
+                        ),
+                      ],
                     );
                   },
                 ),
@@ -305,6 +355,7 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -376,6 +427,12 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
               );
             }),
           ],
+          if (_undoRemovals.isNotEmpty)
+            TextButton.icon(
+              onPressed: _busy ? null : _undoLastRemoval,
+              icon: const Icon(Icons.undo),
+              label: Text('Undo last removal (${_undoRemovals.length})'),
+            ),
           if (_groups.isNotEmpty)
             TextButton.icon(
               onPressed: _busy ? null : () => setState(() {
