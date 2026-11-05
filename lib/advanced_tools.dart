@@ -71,54 +71,192 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
     return Uint8List.fromList(base64Decode(stored));
   }
 
+  String _normaliseRecoveryAnswer(String value) =>
+      value.trim().toLowerCase().replaceAll(RegExp(r'\\s+'), ' ');
+
+  Future<String> _saltedDigest(String value) async {
+    final random = math.Random.secure();
+    final salt = base64Encode(List<int>.generate(16, (_) => random.nextInt(256)));
+    final digest = hashes.sha256.convert(utf8.encode('$salt:$value')).toString();
+    return '$salt:$digest';
+  }
+
   Future<bool> _verifyPin({bool setup = false}) async {
     final pinController = TextEditingController();
     final confirmController = TextEditingController();
+    final animalController = TextEditingController();
     final storedHash = await _secure.read(key: 'aqua_vault_pin_hash');
     final salt = await _secure.read(key: 'aqua_vault_pin_salt');
     if (storedHash == null && !setup) {
       _say('Create a Vault PIN first.');
       return false;
     }
-    final pin = await showDialog<String>(
+    final result = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(storedHash == null ? 'Create Vault PIN' : 'Unlock Vault'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
           TextField(controller: pinController, obscureText: true, keyboardType: TextInputType.number,
             decoration: const InputDecoration(labelText: 'PIN (at least 6 digits)')),
-          if (storedHash == null) TextField(controller: confirmController, obscureText: true,
-            keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Confirm PIN')),
-        ]),
+          if (storedHash == null) ...[
+            TextField(controller: confirmController, obscureText: true, keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Confirm PIN')),
+            TextField(controller: animalController, textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(labelText: 'Favourite animal name (recovery answer)')),
+          ],
+        ])),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, pinController.text), child: const Text('Continue')),
+          if (storedHash != null)
+            TextButton(onPressed: () => Navigator.pop(dialogContext, 'recover'),
+              child: const Text('Forgot PIN?')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, 'pin'),
+            child: const Text('Continue')),
         ],
       ),
     );
-    if (pin == null) return false;
+    if (result == 'recover') {
+      final recovered = await _recoverPin();
+      pinController.dispose();
+      confirmController.dispose();
+      animalController.dispose();
+      return recovered;
+    }
+    if (result != 'pin') {
+      pinController.dispose();
+      confirmController.dispose();
+      animalController.dispose();
+      return false;
+    }
+
+    final pin = pinController.text;
     if (storedHash == null) {
-      if (pin.length < 6 || pin != confirmController.text) {
-        _say('PIN must be at least 6 digits and both entries must match.');
+      final answer = _normaliseRecoveryAnswer(animalController.text);
+      if (pin.length < 6 || pin != confirmController.text || answer.length < 2) {
+        _say('Use a PIN of at least 6 digits, confirm it, and enter a recovery answer.');
+        pinController.dispose();
+        confirmController.dispose();
+        animalController.dispose();
         return false;
       }
-      final secureRandom = math.Random.secure();
-      final newSalt = base64Encode(List<int>.generate(16, (_) => secureRandom.nextInt(256)));
-      final digest = hashes.sha256.convert(utf8.encode('$newSalt:$pin')).toString();
+      final pinRecord = await _saltedDigest(pin);
+      final answerRecord = await _saltedDigest(answer);
       final key = await AesGcm.with256bits().newSecretKey();
       final keyBytes = await key.extractBytes();
-      await _secure.write(key: 'aqua_vault_pin_salt', value: newSalt);
-      await _secure.write(key: 'aqua_vault_pin_hash', value: digest);
+      await _secure.write(key: 'aqua_vault_pin_salt', value: pinRecord.split(':').first);
+      await _secure.write(key: 'aqua_vault_pin_hash', value: pinRecord.split(':').last);
+      await _secure.write(key: 'aqua_vault_recovery_salt', value: answerRecord.split(':').first);
+      await _secure.write(key: 'aqua_vault_recovery_hash', value: answerRecord.split(':').last);
       await _secure.write(key: 'aqua_vault_key', value: base64Encode(keyBytes));
-      _say('Encrypted Vault created. Keep your PIN safe; it cannot be recovered.');
+      _say('Encrypted Vault created. Keep your PIN and recovery answer private.');
+      pinController.dispose();
+      confirmController.dispose();
+      animalController.dispose();
       return true;
     }
     final digest = hashes.sha256.convert(utf8.encode('$salt:$pin')).toString();
+    pinController.dispose();
+    confirmController.dispose();
+    animalController.dispose();
     if (digest != storedHash) {
       _say('Incorrect PIN.');
       return false;
     }
     return true;
+  }
+
+  Future<bool> _recoverPin() async {
+    final answerController = TextEditingController();
+    final newPinController = TextEditingController();
+    final confirmController = TextEditingController();
+    final recoverySalt = await _secure.read(key: 'aqua_vault_recovery_salt');
+    final recoveryHash = await _secure.read(key: 'aqua_vault_recovery_hash');
+    if (recoverySalt == null || recoveryHash == null) {
+      _say('Recovery is not configured on this Vault. Use device authentication if available.');
+      answerController.dispose();
+      newPinController.dispose();
+      confirmController.dispose();
+      return false;
+    }
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Recover Vault PIN'),
+        content: SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Enter the favourite animal name you saved when setting up the Vault.'),
+          TextField(controller: answerController, textCapitalization: TextCapitalization.words,
+            decoration: const InputDecoration(labelText: 'Recovery answer')),
+          TextField(controller: newPinController, obscureText: true, keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'New PIN (at least 6 digits)')),
+          TextField(controller: confirmController, obscureText: true, keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Confirm new PIN')),
+        ])),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Reset PIN')),
+        ],
+      ),
+    );
+    if (result != true) {
+      answerController.dispose();
+      newPinController.dispose();
+      confirmController.dispose();
+      return false;
+    }
+    final answerDigest = hashes.sha256.convert(
+      utf8.encode('$recoverySalt:${_normaliseRecoveryAnswer(answerController.text)}'),
+    ).toString();
+    final newPin = newPinController.text;
+    if (answerDigest != recoveryHash || newPin.length < 6 || newPin != confirmController.text) {
+      _say('Recovery answer or new PIN is invalid. Try again.');
+      answerController.dispose();
+      newPinController.dispose();
+      confirmController.dispose();
+      return false;
+    }
+    final pinRecord = await _saltedDigest(newPin);
+    await _secure.write(key: 'aqua_vault_pin_salt', value: pinRecord.split(':').first);
+    await _secure.write(key: 'aqua_vault_pin_hash', value: pinRecord.split(':').last);
+    _say('PIN reset successfully. Your encrypted Vault files are unchanged.');
+    answerController.dispose();
+    newPinController.dispose();
+    confirmController.dispose();
+    return true;
+  }
+
+  Future<void> _changePin() async {
+    if (!await _verifyPin()) return;
+    final newPinController = TextEditingController();
+    final confirmController = TextEditingController();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Change Vault PIN'),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: newPinController, obscureText: true, keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'New PIN (at least 6 digits)')),
+          TextField(controller: confirmController, obscureText: true, keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Confirm new PIN')),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Save PIN')),
+        ],
+      ),
+    );
+    if (result == true) {
+      final pin = newPinController.text;
+      if (pin.length < 6 || pin != confirmController.text) {
+        _say('PIN must be at least 6 digits and both entries must match.');
+      } else {
+        final pinRecord = await _saltedDigest(pin);
+        await _secure.write(key: 'aqua_vault_pin_salt', value: pinRecord.split(':').first);
+        await _secure.write(key: 'aqua_vault_pin_hash', value: pinRecord.split(':').last);
+        _say('Vault PIN changed successfully.');
+      }
+    }
+    newPinController.dispose();
+    confirmController.dispose();
   }
 
   Future<bool> _unlockVault() async {
@@ -166,6 +304,11 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
             const SizedBox(height: 12),
             FilledButton.icon(onPressed: () async { Navigator.pop(context); await _addToVault(); },
               icon: const Icon(Icons.add), label: const Text('Encrypt a file into Vault')),
+            OutlinedButton.icon(
+              onPressed: _busy ? null : _changePin,
+              icon: const Icon(Icons.password),
+              label: const Text('Change Vault PIN'),
+            ),
             Expanded(child: _vaultFiles.isEmpty
               ? const Center(child: Text('Vault is empty.'))
               : ListView(children: _vaultFiles.map((file) => ListTile(
