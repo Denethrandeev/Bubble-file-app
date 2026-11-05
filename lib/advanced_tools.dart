@@ -99,7 +99,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
     return true;
   }
 
-  Future<bool> _unlockVault({bool setup = false}) async {
+  Future<bool> _unlockVault() async {
     final hasPin = await _secure.read(key: 'aqua_vault_pin_hash') != null;
     if (!hasPin) return _verifyPin(setup: true);
     final useBiometric = await showDialog<bool>(
@@ -129,7 +129,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
 
   Future<void> _openVault() async {
     if (!await _unlockVault()) return;
-    final directory = await _vaultDirectory();
+    await _vaultDirectory();
     await _refreshVault();
     if (!mounted) return;
     await showModalBottomSheet<void>(
