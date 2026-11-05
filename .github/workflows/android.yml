@@ -46,6 +46,8 @@ jobs:
                   data = path.read_text()
                   data = data.replace("minSdk = flutter.minSdkVersion", "minSdk = 23")
                   data = data.replace("minSdkVersion flutter.minSdkVersion", "minSdkVersion 23")
+                  data = data.replace("compileSdk = flutter.compileSdkVersion", "compileSdk = 36")
+                  data = data.replace("compileSdkVersion flutter.compileSdkVersion", "compileSdkVersion 36")
                   path.write_text(data)
           PY
       - name: Enable FragmentActivity for biometric authentication
