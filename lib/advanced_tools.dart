@@ -16,9 +16,15 @@ import 'package:local_auth/local_auth.dart';
 import 'package:path_provider/path_provider.dart';
 
 class AquaAdvancedTools extends StatefulWidget {
-  const AquaAdvancedTools({super.key, required this.targetDirectory, required this.accent});
+  const AquaAdvancedTools({
+    super.key,
+    required this.targetDirectory,
+    required this.accent,
+    this.openVaultOnStart = false,
+  });
   final Directory targetDirectory;
   final Color accent;
+  final bool openVaultOnStart;
 
   @override
   State<AquaAdvancedTools> createState() => _AquaAdvancedToolsState();
@@ -26,6 +32,16 @@ class AquaAdvancedTools extends StatefulWidget {
 
 class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
   static const _secure = FlutterSecureStorage();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.openVaultOnStart) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _openVault();
+      });
+    }
+  }
   final _auth = LocalAuthentication();
   bool _busy = false;
   String _status = 'Choose a tool to begin.';
@@ -498,7 +514,6 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
       if (_busy) const LinearProgressIndicator(),
       Text(_status, style: const TextStyle(color: Colors.white70)),
       const SizedBox(height: 12),
-      _toolCard('Encrypted Secret Vault', 'AES-256-GCM encryption, PIN and device authentication', Icons.lock, _openVault),
       _toolCard('Create ZIP', 'Compress selected files into one archive', Icons.archive, _createZip),
       _toolCard('Extract ZIP', 'Extract an archive with path-traversal checks', Icons.unarchive, _extractZip),
       _toolCard('GPS photo map', 'Read EXIF GPS from selected images and open map locations', Icons.location_on, _scanGpsPhotos),
@@ -538,7 +553,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
         _say('Face detection alone cannot safely identify matching people. Similarity albums need a verified offline embedding model; this feature is not falsely marked as complete.');
       }),
       const SizedBox(height: 12),
-      const Text('Privacy: GPS scans only the images you select. Vault files are encrypted locally; losing the PIN and device key means the original files cannot be recovered.', style: TextStyle(color: Colors.white54, fontSize: 11)),
+      const Text('Privacy: GPS scans only the images you select. Encrypted private files stay on this device; keep authentication details safe.', style: TextStyle(color: Colors.white54, fontSize: 11)),
     ]),
   );
 }
