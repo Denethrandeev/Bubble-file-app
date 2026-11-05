@@ -474,12 +474,22 @@ class _AquaAppState extends State<AquaApp> {
   }
 
   Future<void> _deleteAgainForTwoHours(Map<String, dynamic> record) async {
+    final oldStage = record['stage'];
+    final oldStarted = record['stageStartedAt'];
     setState(() {
       record['stage'] = 'shred';
       record['stageStartedAt'] = DateTime.now().millisecondsSinceEpoch;
     });
-    await _saveRecycleRecords();
-    _message('Moved to 2-hour temporary recovery stage.');
+    try {
+      await _saveRecycleRecords();
+      _message('Moved to 2-hour temporary recovery stage.');
+    } catch (e) {
+      setState(() {
+        record['stage'] = oldStage;
+        record['stageStartedAt'] = oldStarted;
+      });
+      _message('Could not save the recovery timer; item remains in Recycle Bin: $e');
+    }
   }
 
   String _remainingTime(Map<String, dynamic> record) {
