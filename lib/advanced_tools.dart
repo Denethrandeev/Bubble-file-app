@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'face_albums.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:crypto/crypto.dart' as hashes;
 import 'package:exif/exif.dart';
@@ -817,8 +818,13 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
           child: Text(_performanceSummary, style: const TextStyle(color: Colors.white70, fontSize: 11))),
       ],
       _toolCard('Import from SD card / USB', 'Use Android system picker to select files from removable storage', Icons.usb, _importExternal),
-      _toolCard('Face Similarity / Person Albums', 'Not enabled: requires a bundled offline face-embedding model and device testing', Icons.face, () {
-        _say('Face detection alone cannot safely identify matching people. Similarity albums need a verified offline embedding model; this feature is not falsely marked as complete.');
+      _toolCard('Face Similarity / Person Albums', 'Find similar faces locally and review possible people groups', Icons.face_retouching_natural, () {
+        Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => FaceAlbumsPage(
+            targetDirectory: widget.targetDirectory,
+            accent: widget.accent,
+          ),
+        ));
       }),
       const SizedBox(height: 12),
       const Text('Privacy: GPS scans only the images you select. Encrypted private files stay on this device; keep authentication details safe.', style: TextStyle(color: Colors.white54, fontSize: 11)),
