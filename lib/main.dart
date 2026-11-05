@@ -1024,7 +1024,7 @@ class _AquaAppState extends State<AquaApp> {
           borderRadius: radius,
           border: Border.all(color: Colors.white.withOpacity(.15), width: 1),
         ),
-        child: child,
+        child: Material(color: Colors.transparent, child: child),
       );
     }
     return ClipRRect(
@@ -1040,7 +1040,7 @@ class _AquaAppState extends State<AquaApp> {
             border: Border.all(color: Colors.white.withOpacity(.17), width: 1),
             boxShadow: [BoxShadow(color: _accent.withOpacity(.055), blurRadius: 24)],
           ),
-          child: child,
+          child: Material(color: Colors.transparent, child: child),
         ),
       ),
     );
