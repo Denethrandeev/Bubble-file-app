@@ -9,20 +9,39 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
       - name: Create Android platform scaffold
         run: flutter create --platforms=android --project-name aqua_file_manager .
+      - name: Add Android storage permissions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("android/app/src/main/AndroidManifest.xml")
+          data = path.read_text()
+          permissions = """    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+              <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+              <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+              <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+              <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+              <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+          """
+          if "android.permission.MANAGE_EXTERNAL_STORAGE" not in data:
+              data = data.replace("<application", permissions + "    <application", 1)
+              path.write_text(data)
+          PY
       - name: Resolve packages
         run: flutter pub get
       - name: Analyze
         run: flutter analyze --no-fatal-infos
+      - name: Run tests
+        run: flutter test
       - name: Build debug APK
         run: flutter build apk --debug
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: aqua-file-manager-debug-apk
           path: build/app/outputs/flutter-apk/app-debug.apk
