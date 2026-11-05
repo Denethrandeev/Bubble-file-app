@@ -1233,16 +1233,16 @@ class _AquaAppState extends State<AquaApp> {
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _accent)),
         ]),
         Slider(
-          value: _bubbleSpeed,
-          min: .3,
-          max: 2.2,
-          divisions: 19,
+          value: _bubbleSpeed.clamp(.1, 3.0),
+          min: .1,
+          max: 3.0,
+          // Continuous slider: users can choose any speed, not fixed steps.
           activeColor: _accent,
           onChanged: (value) => setState(() => _bubbleSpeed = value),
         ),
         const Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('Slow', style: TextStyle(fontSize: 10, color: Colors.white54)),
-          Text('Fast', style: TextStyle(fontSize: 10, color: Colors.white54)),
+          Text('0.1×  Very slow', style: TextStyle(fontSize: 10, color: Colors.white54)),
+          Text('3.0×  Very fast', style: TextStyle(fontSize: 10, color: Colors.white54)),
         ]),
       ])),
       _switchTile('Light appearance', 'Switch the interface brightness', _light,
