@@ -29,10 +29,24 @@ jobs:
               <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
               <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
               <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
+              <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+              <uses-permission android:name="android.permission.USE_FINGERPRINT" />
           """
           if "android.permission.MANAGE_EXTERNAL_STORAGE" not in data:
               data = data.replace("<application", permissions + "    <application", 1)
               path.write_text(data)
+          PY
+      - name: Configure biometric-compatible Android SDK
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for name in ("android/app/build.gradle.kts", "android/app/build.gradle"):
+              path = Path(name)
+              if path.exists():
+                  data = path.read_text()
+                  data = data.replace("minSdk = flutter.minSdkVersion", "minSdk = 23")
+                  data = data.replace("minSdkVersion flutter.minSdkVersion", "minSdkVersion 23")
+                  path.write_text(data)
           PY
       - name: Resolve packages
         run: flutter pub get
