@@ -285,7 +285,7 @@ class _AquaAppState extends State<AquaApp> {
     final path = volume['path'] as String? ?? '';
     final total = (volume['total'] as num?)?.toInt() ?? 0;
     final free = (volume['free'] as num?)?.toInt() ?? 0;
-    final used = total <= 0 ? 0.0 : ((total - free) / total).clamp(0.0, 1.0);
+    final used = total <= 0 ? 0.0 : ((total - free) / total).clamp(0.0, 1.0).toDouble();
     final removable = volume['removable'] == true;
     final label = removable ? 'EXTERNAL' : 'INTERNAL';
     final selected = _root.path == path;
