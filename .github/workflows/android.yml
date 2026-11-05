@@ -46,8 +46,20 @@ jobs:
                   data = path.read_text()
                   data = data.replace("minSdk = flutter.minSdkVersion", "minSdk = 23")
                   data = data.replace("minSdkVersion flutter.minSdkVersion", "minSdkVersion 23")
-                  data = data.replace("compileSdk = flutter.compileSdkVersion", "compileSdk = 36")
-                  data = data.replace("compileSdkVersion flutter.compileSdkVersion", "compileSdkVersion 36")
+                  lines = data.splitlines()
+                  changed = 0
+                  for i, line in enumerate(lines):
+                      stripped = line.strip()
+                      if stripped.startswith("compileSdk ="):
+                          lines[i] = line[:len(line)-len(line.lstrip())] + "compileSdk = 36"
+                          changed += 1
+                      elif stripped.startswith("compileSdkVersion "):
+                          lines[i] = line[:len(line)-len(line.lstrip())] + "compileSdkVersion 36"
+                          changed += 1
+                  if changed == 0:
+                      raise SystemExit(f"No compileSdk setting found in {name}")
+                  data = "\n".join(lines) + "\n"
+                  print(f"Configured {name}: compileSdk 36 ({changed} setting(s))")
                   path.write_text(data)
           PY
       - name: Enable FragmentActivity for biometric authentication
