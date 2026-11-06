@@ -1612,6 +1612,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
           _category('APKs', Icons.android_rounded),
           _category('All files', Icons.folder_copy_rounded),
           _category('Places', Icons.location_on_rounded),
+          _category('Face Albums', Icons.face_retouching_natural),
         ],
       ),
       const SizedBox(height: 22),
@@ -1663,6 +1664,13 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       if (title == 'Places') {
         Navigator.of(context).push(MaterialPageRoute<void>(
           builder: (_) => LocationAlbumsPage(
+            targetDirectory: _root,
+            accent: _accent,
+          ),
+        ));
+      } else if (title == 'Face Albums') {
+        Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => FaceAlbumsPage(
             targetDirectory: _root,
             accent: _accent,
           ),
