@@ -45,39 +45,83 @@ class _StorageDropPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final path = Path()
-      ..moveTo(size.width * .5, size.height * .04)
-      ..cubicTo(size.width * .40, size.height * .22, size.width * .08,
-          size.height * .48, size.width * .08, size.height * .68)
-      ..cubicTo(size.width * .08, size.height * .91, size.width * .25,
-          size.height * .99, size.width * .5, size.height * .99)
-      ..cubicTo(size.width * .75, size.height * .99, size.width * .92,
-          size.height * .91, size.width * .92, size.height * .68)
-      ..cubicTo(size.width * .92, size.height * .48, size.width * .60,
-          size.height * .22, size.width * .5, size.height * .04)
-      ..close();
+    final center = Offset(size.width * .5, size.height * .5);
+    final radius = math.min(size.width, size.height) * .39;
+    final orb = Rect.fromCircle(center: center, radius: radius);
+    final orbPath = Path()..addOval(orb);
 
-    canvas.drawPath(path, Paint()
-      ..color = Colors.white.withOpacity(.10)
-      ..style = PaintingStyle.fill);
+    // Soft halo and translucent glass shell.
+    canvas.drawCircle(center, radius * 1.18,
+      Paint()..shader = RadialGradient(colors: [
+        color.withOpacity(.20), color.withOpacity(.055), Colors.transparent,
+      ]).createShader(Rect.fromCircle(center: center, radius: radius * 1.18)));
+    canvas.drawCircle(center, radius,
+      Paint()..shader = const RadialGradient(
+        center: Alignment(-.42, -.55),
+        radius: .95,
+        colors: [Color(0x66FFFFFF), Color(0x1AFFFFFF), Color(0x08000000)],
+        stops: [0, .38, 1],
+      ).createShader(orb));
+
     canvas.save();
-    canvas.clipPath(path);
-    if (active) {
-      final top = size.height * (1 - fraction.clamp(0.0, 1.0));
-      canvas.drawRect(Rect.fromLTRB(0, top, size.width, size.height),
-        Paint()..shader = LinearGradient(
+    canvas.clipPath(orbPath);
+    if (active && fraction > 0) {
+      final level = orb.bottom - (orb.height * fraction.clamp(0.0, 1.0));
+      final wave = Path()..moveTo(orb.left, level);
+      for (var i = 0; i <= 24; i++) {
+        final x = orb.left + orb.width * i / 24;
+        final y = level + math.sin(i / 24 * math.pi * 2.2) * radius * .075;
+        wave.lineTo(x, y);
+      }
+      wave
+        ..lineTo(orb.right, orb.bottom)
+        ..lineTo(orb.left, orb.bottom)
+        ..close();
+      canvas.drawPath(wave, Paint()
+        ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [color.withOpacity(.55), color],
-        ).createShader(Offset.zero & size));
+          colors: [color.withOpacity(.72), color.withOpacity(.96)],
+        ).createShader(orb));
+      // Tiny suspended air bubbles make the filled water feel alive.
+      final bubblePaint = Paint()..color = Colors.white.withOpacity(.58);
+      for (final p in <Offset>[
+        Offset(.30, .73), Offset(.68, .82), Offset(.53, .61),
+      ]) {
+        final y = orb.top + orb.height * p.dy;
+        if (y > level + radius * .05) {
+          canvas.drawCircle(Offset(orb.left + orb.width * p.dx, y),
+            radius * (p.dx == .53 ? .055 : .038), bubblePaint);
+        }
+      }
+      // A fine bright meniscus along the water line.
+      final meniscus = Path()..moveTo(orb.left, level);
+      for (var i = 0; i <= 24; i++) {
+        final x = orb.left + orb.width * i / 24;
+        meniscus.lineTo(x, level + math.sin(i / 24 * math.pi * 2.2) * radius * .075);
+      }
+      canvas.drawPath(meniscus, Paint()
+        ..color = Colors.white.withOpacity(.58)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.15);
     }
     canvas.restore();
-    canvas.drawPath(path, Paint()
-      ..color = color.withOpacity(.9)
+
+    // Glass rim, broad reflection and pinpoint sparkle.
+    canvas.drawCircle(center, radius, Paint()
+      ..color = Colors.white.withOpacity(.72)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.7);
-    canvas.drawCircle(Offset(size.width * .35, size.height * .45),
-      size.width * .055, Paint()..color = Colors.white.withOpacity(.65));
+      ..strokeWidth = 1.35);
+    canvas.drawOval(Rect.fromCenter(
+      center: Offset(center.dx - radius * .34, center.dy - radius * .52),
+      width: radius * .54, height: radius * .18,
+    ), Paint()..color = Colors.white.withOpacity(.62));
+    canvas.drawCircle(Offset(center.dx - radius * .52, center.dy - radius * .24),
+      radius * .075, Paint()..color = Colors.white.withOpacity(.88));
+    canvas.drawCircle(Offset(center.dx + radius * .56, center.dy + radius * .58),
+      radius * .10, Paint()..color = color.withOpacity(.62));
+    canvas.drawCircle(Offset(center.dx + radius * .78, center.dy - radius * .70),
+      radius * .10, Paint()..color = Colors.white.withOpacity(.78));
   }
 
   @override
@@ -257,8 +301,8 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       },
       borderRadius: BorderRadius.circular(18),
       child: Container(
-        width: 142,
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 10),
+        width: 154,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
         decoration: BoxDecoration(
           color: selected ? _accent.withOpacity(.12) : Colors.white.withOpacity(.035),
           borderRadius: BorderRadius.circular(18),
@@ -266,7 +310,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
         ),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           CustomPaint(
-            size: const Size(48, 58),
+            size: const Size(78, 78),
             painter: _StorageDropPainter(
               fraction: used,
               color: color,
