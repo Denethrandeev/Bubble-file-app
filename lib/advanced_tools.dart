@@ -357,7 +357,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
             const SizedBox(height: 8),
             const Text('Files are stored encrypted with AES-256-GCM.', style: TextStyle(color: Colors.white70)),
             const SizedBox(height: 12),
-            FilledButton.icon(onPressed: () async { Navigator.pop(context); await _addToVault(); },
+            FilledButton.icon(onPressed: () async { Navigator.pop(context); await _addToVault(alreadyUnlocked: true); },
               icon: const Icon(Icons.add), label: const Text('Encrypt a file into Vault')),
             OutlinedButton.icon(
               onPressed: _busy ? null : _changePin,
@@ -371,7 +371,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
                   title: Text(file.uri.pathSegments.last, maxLines: 1, overflow: TextOverflow.ellipsis),
                   trailing: IconButton(icon: const Icon(Icons.save_alt), onPressed: () async {
                     Navigator.pop(context);
-                    await _exportFromVault(file);
+                    await _exportFromVault(file, alreadyUnlocked: true);
                   }),
                 )).toList())),
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
@@ -386,8 +386,8 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
     if (mounted) setState(() => _vaultFiles = files);
   }
 
-  Future<void> _addToVault() async {
-    if (!await _unlockVault()) return;
+  Future<void> _addToVault({bool alreadyUnlocked = false}) async {
+    if (!alreadyUnlocked && !await _unlockVault()) return;
     final picked = await FilePicker.platform.pickFiles(withData: false);
     final path = picked?.files.single.path;
     if (path == null) return;
@@ -416,8 +416,8 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
     }
   }
 
-  Future<void> _exportFromVault(File encryptedFile) async {
-    if (!await _unlockVault()) return;
+  Future<void> _exportFromVault(File encryptedFile, {bool alreadyUnlocked = false}) async {
+    if (!alreadyUnlocked && !await _unlockVault()) return;
     final destination = await FilePicker.platform.getDirectoryPath();
     if (destination == null) return;
     try {
