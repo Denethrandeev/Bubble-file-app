@@ -187,6 +187,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   Color get _accent => aquaAccents[_theme];
 
   bool _showSplash = true;
+  final GlobalKey<_BubbleFieldState> _bubbleFieldKey = GlobalKey<_BubbleFieldState>();
 
   @override
   void initState() {
@@ -1297,15 +1298,27 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
           ? const BubbleSplashScreen()
           : Scaffold(
         body: Listener(
-          onPointerDown: _onSecretGestureDown,
-          onPointerMove: _onSecretGestureMove,
-          onPointerUp: _onSecretGestureUp,
-          onPointerCancel: _onSecretGestureCancel,
+          onPointerDown: (event) {
+            _bubbleFieldKey.currentState?.handlePointerDown(event.localPosition);
+            _onSecretGestureDown(event);
+          },
+          onPointerMove: (event) {
+            _bubbleFieldKey.currentState?.handlePointerMove(event.localPosition);
+            _onSecretGestureMove(event);
+          },
+          onPointerUp: (event) {
+            _bubbleFieldKey.currentState?.handlePointerUp();
+            _onSecretGestureUp(event);
+          },
+          onPointerCancel: (event) {
+            _bubbleFieldKey.currentState?.handlePointerUp();
+            _onSecretGestureCancel(event);
+          },
           child: Stack(children: [
           Positioned.fill(child: AquaBackdrop(reduced: _performance)),
           if (_animations)
             Positioned.fill(child: BubbleField(
-              key: const ValueKey('aqua-bubbles'),
+              key: _bubbleFieldKey,
               accent: _accent,
               gravityEnabled: _gravity,
               reduced: _performance,
@@ -2231,6 +2244,17 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
     _droplets.removeWhere((drop) => drop.life <= 0);
   }
 
+  // Forward pointer events from the parent Listener because this painter
+  // sits behind the interactive file-manager UI in the Stack.
+  void handlePointerDown(Offset local) {
+    _finger = local;
+    _popAt(local);
+  }
+
+  void handlePointerMove(Offset local) => _finger = local;
+
+  void handlePointerUp() => _finger = null;
+
   void _pointer(Offset local) => _finger = local;
 
   void _releasePointer() => _finger = null;
@@ -2325,22 +2349,10 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: (context, constraints) {
     _size = Size(constraints.maxWidth, constraints.maxHeight);
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onPanStart: (details) => _pointer(details.localPosition),
-      onPanUpdate: (details) => _pointer(details.localPosition),
-      onPanEnd: (_) => _releasePointer(),
-      onTapDown: (details) {
-        _pointer(details.localPosition);
-        _popAt(details.localPosition);
-      },
-      onTapUp: (_) => _releasePointer(),
-      onTapCancel: _releasePointer,
-      child: RepaintBoundary(child: CustomPaint(
-        painter: _BubblePainter(_bubbles, _ripples, _droplets, _ticker),
-        size: Size.infinite,
-      )),
-    );
+    return RepaintBoundary(child: CustomPaint(
+      painter: _BubblePainter(_bubbles, _ripples, _droplets, _ticker),
+      size: Size.infinite,
+    ));
   });
 }
 
