@@ -141,7 +141,7 @@ class _MediaThumbnailState extends State<MediaThumbnail> {
         }
         return _fallback(
           _isVideo ? Icons.movie_rounded :
-          (_isAudio ? Icons.music_note_rounded : Icons.insert_drive_file_rounded),
+          (_isAudio ? Icons.water_drop_rounded : Icons.insert_drive_file_rounded),
         );
       },
     );
