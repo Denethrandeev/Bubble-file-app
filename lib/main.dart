@@ -1510,6 +1510,16 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
           _category('Documents', Icons.description_rounded),
           _category('Downloads', Icons.download_rounded),
           _category('Places', Icons.location_on_rounded),
+          InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => _openAdvancedTools(openVaultOnStart: true),
+            child: _glass(child: Row(children: [
+              Icon(Icons.lock_rounded, color: _accent, size: 25),
+              const SizedBox(width: 10),
+              const Expanded(child: Text('Secret Vault', style: TextStyle(fontWeight: FontWeight.w600))),
+              const Icon(Icons.chevron_right_rounded, color: Colors.white38, size: 18),
+            ])),
+          ),
         ],
       ),
       const SizedBox(height: 14),
