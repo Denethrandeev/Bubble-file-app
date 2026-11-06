@@ -4,7 +4,6 @@ import 'dart:math' as math;
 
 import 'package:face_detection_tflite/face_detection_tflite.dart' as face_ml;
 import 'package:flutter/material.dart';
-import 'package:open_filex/open_filex.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 /// On-device, temporary face-similarity albums.
@@ -283,6 +282,43 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
     setState(() {});
   }
 
+  Future<void> _viewPhoto(String path) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog.fullscreen(
+        backgroundColor: const Color(0xFF050B12),
+        child: Scaffold(
+          backgroundColor: const Color(0xFF050B12),
+          appBar: AppBar(
+            backgroundColor: const Color(0xFF050B12),
+            foregroundColor: Colors.white,
+            title: Text(path.split(Platform.pathSeparator).last,
+              maxLines: 1, overflow: TextOverflow.ellipsis),
+            actions: [
+              IconButton(
+                tooltip: 'Close image',
+                onPressed: () => Navigator.pop(dialogContext),
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              minScale: .8,
+              maxScale: 6,
+              child: Image.file(
+                File(path),
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.broken_image_outlined, color: Colors.white70, size: 56),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showGroup(_PersonCluster group, int index) {
     showModalBottomSheet<void>(
       context: context,
@@ -325,7 +361,7 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
                       fit: StackFit.expand,
                       children: [
                         InkWell(
-                          onTap: () => OpenFilex.open(path),
+                          onTap: () => _viewPhoto(path),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(12),
                             child: Image.file(
