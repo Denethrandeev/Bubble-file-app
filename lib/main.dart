@@ -1985,7 +1985,12 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       borderRadius: BorderRadius.circular(17),
       border: Border.all(color: _light ? const Color(0xFFE4E8EC) : const Color(0xFF2A3742)),
     ),
-    child: child,
+    child: Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(17),
+      clipBehavior: Clip.antiAlias,
+      child: child,
+    ),
   );
 
   // Standard file-manager surfaces follow Samsung One UI's clean, flat layout.
