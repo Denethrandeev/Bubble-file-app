@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'face_albums.dart';
+import 'location_albums.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:crypto/crypto.dart' as hashes;
 import 'package:exif/exif.dart';
@@ -769,7 +770,14 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
       const SizedBox(height: 12),
       _toolCard('Create ZIP', 'Compress selected files into one archive', Icons.archive, _createZip),
       _toolCard('Extract ZIP', 'Extract an archive with path-traversal checks', Icons.unarchive, _extractZip),
-      _toolCard('GPS photo map', 'Read EXIF GPS from selected images and open map locations', Icons.location_on, _scanGpsPhotos),
+      _toolCard('Location Albums', 'Group phone photos by embedded GPS location and view them on a map', Icons.location_on, () {
+        Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => LocationAlbumsPage(
+            targetDirectory: widget.targetDirectory,
+            accent: widget.accent,
+          ),
+        ));
+      }),
       if (_geoPhotos.isNotEmpty) ...[
         const SizedBox(height: 8),
         Text('Photo locations (${_geoPhotos.length})', style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -827,7 +835,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
         ));
       }),
       const SizedBox(height: 12),
-      const Text('Privacy: GPS scans only the images you select. Encrypted private files stay on this device; keep authentication details safe.', style: TextStyle(color: Colors.white54, fontSize: 11)),
+      const Text('Privacy: photo GPS metadata is processed locally. Map tiles are requested from OpenStreetMap only when you open a map. Encrypted private files stay on this device; keep authentication details safe.', style: TextStyle(color: Colors.white54, fontSize: 11)),
     ]),
   );
 }
