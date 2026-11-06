@@ -748,17 +748,28 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
     _message('Scanning storage for identical files…');
     try {
       final bySize = <int, List<File>>{};
-      final pending = <Directory>[_root];
+      // Search every discovered mounted volume, not only the currently open
+      // folder. This makes duplicates on an SD card visible alongside phone
+      // storage while keeping the scan bounded for low-memory devices.
+      final pending = <Directory>[
+        for (final path in _storageRoots) Directory(path),
+      ];
+      if (pending.isEmpty) pending.add(_root);
+      final seenDirectories = <String>{};
       var visited = 0;
       while (pending.isNotEmpty && visited < 15000) {
         final directory = pending.removeLast();
+        if (!seenDirectories.add(directory.path)) continue;
         try {
           await for (final entity in directory.list(followLinks: false)) {
             if (entity is Directory) {
-              final path = entity.path;
-              if (!path.contains('/Android/data/') &&
+              final path = entity.path.replaceAll('\\\\', '/');
+              final name = entity.uri.pathSegments.isEmpty ? '' : entity.uri.pathSegments.last;
+              if (!name.startsWith('.') &&
+                  !path.contains('/Android/data/') &&
                   !path.contains('/Android/obb/') &&
-                  !path.contains('/aqua_recycle_bin/')) {
+                  !path.contains('/aqua_recycle_bin/') &&
+                  !path.contains('/aqua_encrypted_vault/')) {
                 pending.add(entity);
               }
             } else if (entity is File) {
@@ -770,7 +781,10 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
             }
             if (visited >= 15000) break;
           }
-        } catch (_) {}
+        } catch (_) {
+          // A removable volume can disappear or contain folders Android
+          // does not expose; continue scanning the remaining directories.
+        }
       }
       final byHash = <String, List<File>>{};
       for (final candidates in bySize.values.where((items) => items.length > 1)) {
@@ -1214,8 +1228,46 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && _hasStorage) {
-      _refreshStorageVolumes();
+    if (state == AppLifecycleState.resumed) {
+      // Android 11+ sends the user to a special Settings screen for
+      // MANAGE_EXTERNAL_STORAGE. On the first launch _hasStorage is false,
+      // so checking only when it is already true leaves the app stuck after
+      // the user grants access. Re-check the permission whenever we resume.
+      unawaited(_syncStoragePermissionAfterResume());
+    }
+  }
+
+  Future<void> _syncStoragePermissionAfterResume() async {
+    if (!Platform.isAndroid) return;
+    try {
+      final status = await Permission.manageExternalStorage.status;
+      if (!mounted) return;
+      if (status.isGranted) {
+        final newlyGranted = !_hasStorage;
+        if (newlyGranted) {
+          setState(() {
+            _hasStorage = true;
+            _storageMessage = 'All files access is enabled.';
+          });
+        }
+        await _loadStorageInfo();
+        await _discoverStorageRoots();
+        await _loadStorageVolumes();
+        if (newlyGranted) {
+          await _loadDirectory(_root);
+        } else {
+          await _refreshStorageVolumes();
+        }
+      } else if (_hasStorage) {
+        setState(() {
+          _hasStorage = false;
+          _storageMessage = 'Storage access is not enabled. Tap Check permission to grant access again.';
+        });
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() => _storageMessage = 'Could not re-check storage access: $error');
+      }
     }
   }
 
