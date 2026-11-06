@@ -7,6 +7,7 @@ import 'dart:ui' as ui;
 
 import 'advanced_tools.dart';
 import 'media_thumbnail.dart';
+import 'location_albums.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
@@ -1365,6 +1366,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
           _category('Audio', Icons.headphones_rounded),
           _category('Documents', Icons.description_rounded),
           _category('Downloads', Icons.download_rounded),
+          _category('Places', Icons.location_on_rounded),
         ],
       ),
       const SizedBox(height: 14),
@@ -1394,7 +1396,14 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   Widget _category(String title, IconData icon) => InkWell(
     borderRadius: BorderRadius.circular(20),
     onTap: () {
-      if (title == 'All files') {
+      if (title == 'Places') {
+        Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => LocationAlbumsPage(
+            targetDirectory: _root,
+            accent: _accent,
+          ),
+        ));
+      } else if (title == 'All files') {
         setState(() { _fileCategory = title; _search = ''; _tab = 1; });
         _loadDirectory(_root);
       } else {
