@@ -679,6 +679,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
       if (_busy) const LinearProgressIndicator(),
       Text(_status, style: const TextStyle(color: Colors.white70)),
       const SizedBox(height: 12),
+      _toolCard('Secret Vault', 'Unlock your encrypted private files, create a PIN, import and export files', Icons.lock, _openVault),
       _toolCard('Create ZIP', 'Compress selected files into one archive', Icons.archive, _createZip),
       _toolCard('Extract ZIP', 'Extract an archive with path-traversal checks', Icons.unarchive, _extractZip),
       _toolCard('Location Albums', 'Group phone photos by embedded GPS location and view them on a map', Icons.location_on, () {

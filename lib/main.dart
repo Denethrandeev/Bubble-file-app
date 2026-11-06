@@ -847,6 +847,23 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
 
   int? _secretGesturePointer;
   final List<Offset> _secretGesturePoints = <Offset>[];
+  int _secretBubbleTapCount = 0;
+  Timer? _secretBubbleTapTimer;
+
+  void _onSecretBubbleTap() {
+    if (_tab != 0 || !mounted) return;
+    _secretBubbleTapCount++;
+    _secretBubbleTapTimer?.cancel();
+    _secretBubbleTapTimer = Timer(const Duration(milliseconds: 1400), () {
+      _secretBubbleTapCount = 0;
+    });
+    if (_secretBubbleTapCount >= 3) {
+      _secretBubbleTapCount = 0;
+      _secretBubbleTapTimer?.cancel();
+      unawaited(HapticFeedback.mediumImpact());
+      unawaited(_openAdvancedTools(openVaultOnStart: true));
+    }
+  }
 
   void _onSecretGestureDown(PointerDownEvent event) {
     if (_tab != 0 || _secretGesturePointer != null) return;
@@ -1336,6 +1353,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _waterSensor?.cancel();
     _recycleTimer?.cancel();
+    _secretBubbleTapTimer?.cancel();
     _mediaAudioPlayer.dispose();
     super.dispose();
   }
@@ -1382,6 +1400,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
               gravityEnabled: _gravity,
               reduced: _performance,
               speed: _bubbleSpeed,
+              onBubbleTap: _onSecretBubbleTap,
             )),
           SafeArea(child: Column(children: [
             _header(foreground),
@@ -1491,6 +1510,16 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
           _category('Documents', Icons.description_rounded),
           _category('Downloads', Icons.download_rounded),
           _category('Places', Icons.location_on_rounded),
+          InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => _openAdvancedTools(openVaultOnStart: true),
+            child: _glass(child: Row(children: [
+              Icon(Icons.lock_rounded, color: _accent, size: 25),
+              const SizedBox(width: 10),
+              const Expanded(child: Text('Secret Vault', style: TextStyle(fontWeight: FontWeight.w600))),
+              const Icon(Icons.chevron_right_rounded, color: Colors.white38, size: 18),
+            ])),
+          ),
         ],
       ),
       const SizedBox(height: 14),
@@ -1685,11 +1714,14 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
                   child: _glass(child: Row(children: [
                     isFolder
                       ? Icon(Icons.folder_rounded, color: _accent, size: 25)
-                      : MediaThumbnail(
-                          key: ValueKey(item.path),
-                          path: item.path,
-                          accent: _accent,
-                          size: _viewMode == 'Compact' ? 34 : 50,
+                      : InkWell(
+                          onTap: () => _openEntity(item),
+                          child: MediaThumbnail(
+                            key: ValueKey(item.path),
+                            path: item.path,
+                            accent: _accent,
+                            size: _viewMode == 'Compact' ? 34 : 50,
+                          ),
                         ),
                     SizedBox(width: _viewMode == 'Compact' ? 7 : 11),
                     Expanded(child: InkWell(
@@ -2141,11 +2173,12 @@ class _WaterDroplet {
 }
 
 class BubbleField extends StatefulWidget {
-  const BubbleField({super.key, required this.accent, required this.gravityEnabled, required this.reduced, required this.speed});
+  const BubbleField({super.key, required this.accent, required this.gravityEnabled, required this.reduced, required this.speed, this.onBubbleTap});
   final Color accent;
   final bool gravityEnabled;
   final bool reduced;
   final double speed;
+  final VoidCallback? onBubbleTap;
   @override
   State<BubbleField> createState() => _BubbleFieldState();
 }
@@ -2330,6 +2363,7 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
       }
     }
     if (best < 0) return;
+    widget.onBubbleTap?.call();
     final b = _bubbles.removeAt(best);
     _ripples.add(_Ripple(
       b.x,
