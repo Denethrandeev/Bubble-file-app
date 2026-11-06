@@ -32,8 +32,8 @@ const List<Color> aquaAccents = <Color>[
 ];
 
 
-class _StorageDropPainter extends CustomPainter {
-  const _StorageDropPainter({
+class _AnimatedStorageDrop extends StatefulWidget {
+  const _AnimatedStorageDrop({
     required this.fraction,
     required this.color,
     required this.active,
@@ -42,6 +42,56 @@ class _StorageDropPainter extends CustomPainter {
   final double fraction;
   final Color color;
   final bool active;
+
+  @override
+  State<_AnimatedStorageDrop> createState() => _AnimatedStorageDropState();
+}
+
+class _AnimatedStorageDropState extends State<_AnimatedStorageDrop>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _wave;
+
+  @override
+  void initState() {
+    super.initState();
+    _wave = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 4600),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _wave.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => RepaintBoundary(
+    child: CustomPaint(
+      size: const Size(78, 78),
+      painter: _StorageDropPainter(
+        fraction: widget.fraction,
+        color: widget.color,
+        active: widget.active,
+        phase: _wave,
+      ),
+    ),
+  );
+}
+
+class _StorageDropPainter extends CustomPainter {
+  _StorageDropPainter({
+    required this.fraction,
+    required this.color,
+    required this.active,
+    required Animation<double> phase,
+  }) : _phase = phase, super(repaint: phase);
+
+  final double fraction;
+  final Color color;
+  final bool active;
+  final Animation<double> _phase;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -77,8 +127,6 @@ class _StorageDropPainter extends CustomPainter {
 
     canvas.save();
     canvas.clipPath(dropPath);
-
-    // Translucent glass body.
     canvas.drawRect(drop, Paint()
       ..shader = const LinearGradient(
         begin: Alignment.topLeft,
@@ -88,48 +136,72 @@ class _StorageDropPainter extends CustomPainter {
       ).createShader(drop));
 
     if (active && fraction > 0) {
+      final t = _phase.value * math.pi * 2;
       final level = bottom - h * fraction.clamp(0.0, 1.0);
-      final water = Path()
-        ..moveTo(left - 2, level)
-        ..cubicTo(left + w * .22, level - h * .035,
-            cx - w * .12, level + h * .035, cx, level)
-        ..cubicTo(cx + w * .18, level - h * .025,
-            right - w * .18, level + h * .025, right + 2, level)
+      final amplitude = math.min(h * .022, size.height * .018);
+      final water = Path()..moveTo(left - 2, bottom + 2);
+      // Smooth multi-frequency travelling waves; sampled densely to avoid
+      // angular edges while keeping the painter lightweight.
+      for (var i = 0; i <= 48; i++) {
+        final x = left - 2 + (w + 4) * i / 48;
+        final u = i / 48;
+        final y = level
+            + math.sin(u * math.pi * 2.0 + t) * amplitude
+            + math.sin(u * math.pi * 4.0 - t * .72) * amplitude * .30
+            + math.sin(u * math.pi * 6.0 + t * .42) * amplitude * .12;
+        water.lineTo(x, y);
+      }
+      water
         ..lineTo(right + 2, bottom + 2)
-        ..lineTo(left - 2, bottom + 2)
         ..close();
+
       canvas.drawPath(water, Paint()
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [color.withOpacity(.70), color.withOpacity(.96)],
+          colors: [
+            Color.lerp(color, Colors.white, .20)!.withOpacity(.82),
+            color.withOpacity(.94),
+            Color.lerp(color, Colors.black, .12)!.withOpacity(.98),
+          ],
+          stops: const [0, .22, 1],
         ).createShader(drop));
 
-      // A soft luminous waterline and tiny air bubbles inside the liquid.
-      final line = Path()
-        ..moveTo(left, level)
-        ..cubicTo(left + w * .22, level - h * .035,
-            cx - w * .12, level + h * .035, cx, level)
-        ..cubicTo(cx + w * .18, level - h * .025,
-            right - w * .18, level + h * .025, right, level);
-      canvas.drawPath(line, Paint()
-        ..color = Colors.white.withOpacity(.72)
+      // A subtle second highlight follows the moving water surface.
+      final crest = Path();
+      for (var i = 0; i <= 48; i++) {
+        final x = left + w * i / 48;
+        final u = i / 48;
+        final y = level
+            + math.sin(u * math.pi * 2.0 + t) * amplitude
+            + math.sin(u * math.pi * 4.0 - t * .72) * amplitude * .30
+            + math.sin(u * math.pi * 6.0 + t * .42) * amplitude * .12;
+        if (i == 0) {
+          crest.moveTo(x, y);
+        } else {
+          crest.lineTo(x, y);
+        }
+      }
+      canvas.drawPath(crest, Paint()
+        ..color = Colors.white.withOpacity(.78)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.25);
+        ..strokeWidth = 1.35
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round);
 
+      // Small soft bubbles remain inside the water, not on the glass surface.
       for (final p in <Offset>[
         Offset(.36, .70), Offset(.64, .80), Offset(.53, .58),
       ]) {
         final point = Offset(left + w * p.dx, top + h * p.dy);
         if (point.dy > level + 2) {
           canvas.drawCircle(point, size.width * (p.dx == .53 ? .027 : .019),
-            Paint()..color = Colors.white.withOpacity(.62));
+            Paint()..color = Colors.white.withOpacity(.48));
         }
       }
     }
     canvas.restore();
 
-    // Crisp glass edge, curved reflection and sparkle points.
     canvas.drawPath(dropPath, Paint()
       ..color = Colors.white.withOpacity(.78)
       ..style = PaintingStyle.stroke
@@ -336,13 +408,10 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
           border: Border.all(color: selected ? _accent.withOpacity(.65) : Colors.white.withOpacity(.10)),
         ),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          CustomPaint(
-            size: const Size(78, 78),
-            painter: _StorageDropPainter(
-              fraction: used,
-              color: color,
-              active: total > 0,
-            ),
+          _AnimatedStorageDrop(
+            fraction: used,
+            color: color,
+            active: total > 0,
           ),
           const SizedBox(height: 7),
           Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
