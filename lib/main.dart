@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'advanced_tools.dart';
+import 'media_thumbnail.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
@@ -1438,8 +1439,14 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 7),
                   child: _glass(child: Row(children: [
-                    Icon(isFolder ? Icons.folder_rounded : Icons.insert_drive_file_rounded,
-                      color: isFolder ? _accent : Colors.white70, size: 25),
+                    isFolder
+                      ? Icon(Icons.folder_rounded, color: _accent, size: 25)
+                      : MediaThumbnail(
+                          key: ValueKey(item.path),
+                          path: item.path,
+                          accent: _accent,
+                          size: 50,
+                        ),
                     const SizedBox(width: 11),
                     Expanded(child: InkWell(
                       onTap: () => _openEntity(item),
