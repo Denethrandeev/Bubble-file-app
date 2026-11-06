@@ -32,7 +32,7 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
 
   double? _coordinate(String? raw, String reference) {
     if (raw == null) return null;
-    final values = RegExp(r'-?\\d+(?:\\.\\d+)?').allMatches(raw)
+    final values = RegExp(r'-?\d+(?:\.\d+)?').allMatches(raw)
         .map((match) => double.tryParse(match.group(0)!))
         .whereType<double>().toList();
     if (values.isEmpty) return null;
