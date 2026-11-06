@@ -1034,7 +1034,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver, SingleTi
       await showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
-          backgroundColor: const Color(0xFF102B38),
+          backgroundColor: const Color(0xE610303D),
           title: const Text('Identical files'),
           content: SizedBox(
             width: double.maxFinite,
@@ -1158,7 +1158,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver, SingleTi
     final name = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF102B38),
+        backgroundColor: const Color(0xE610303D),
         title: const Text('New folder'),
         content: TextField(controller: controller, autofocus: true,
           decoration: const InputDecoration(hintText: 'Folder name')),
@@ -1183,7 +1183,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver, SingleTi
     final name = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF102B38),
+        backgroundColor: const Color(0xE610303D),
         title: const Text('Rename'),
         content: TextField(controller: controller, autofocus: true),
         actions: [
@@ -1227,7 +1227,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver, SingleTi
     if (!mounted) return;
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF102B38),
+      backgroundColor: const Color(0xE610303D),
       builder: (context) => Padding(
         padding: const EdgeInsets.all(22),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -1439,7 +1439,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver, SingleTi
       await showModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
-        backgroundColor: const Color(0xFF102B38),
+        backgroundColor: const Color(0xE610303D),
         builder: (sheetContext) => StatefulBuilder(
           builder: (context, setSheetState) => SafeArea(
             child: Padding(
@@ -1745,6 +1745,33 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver, SingleTi
         scaffoldBackgroundColor: base,
         colorScheme: ColorScheme.fromSeed(seedColor: _accent,
           brightness: _light ? Brightness.light : Brightness.dark),
+        // Keep every contextual menu and bottom sheet in the same Aqua-glass
+        // visual language instead of showing default flat Material surfaces.
+        popupMenuTheme: PopupMenuThemeData(
+          color: const Color(0xE610303D),
+          surfaceTintColor: Colors.transparent,
+          elevation: 20,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(19),
+            side: BorderSide(color: _accent.withOpacity(.48), width: 1),
+          ),
+          textStyle: TextStyle(
+            color: _light ? const Color(0xFF102B38) : Colors.white,
+            fontSize: 13,
+          ),
+        ),
+        bottomSheetTheme: BottomSheetThemeData(
+          backgroundColor: const Color(0xE610303D),
+          surfaceTintColor: Colors.transparent,
+          elevation: 22,
+          modalElevation: 22,
+          shape: RoundedRectangleBorder(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+            side: BorderSide(color: _accent.withOpacity(.35), width: 1),
+          ),
+          clipBehavior: Clip.antiAlias,
+          dragHandleColor: _accent.withOpacity(.65),
+        ),
       ),
       home: _showSplash
           ? const BubbleSplashScreen()
