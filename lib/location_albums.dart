@@ -5,6 +5,7 @@ import 'package:exif/exif.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class LocationAlbumsPage extends StatefulWidget {
   const LocationAlbumsPage({super.key, required this.targetDirectory, required this.accent});
@@ -132,10 +133,22 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
 
   Future<void> _scan() async {
     if (_scanning) return;
+    // Android 10+ may redact photo GPS metadata unless this runtime permission is granted.
+    // Continue the scan if denied; some files or Android versions may still expose EXIF GPS.
+    var gpsPermissionGranted = true;
+    try {
+      final permission = await Permission.accessMediaLocation.request();
+      gpsPermissionGranted = permission.isGranted;
+    } catch (_) {
+      gpsPermissionGranted = false;
+    }
+    if (!mounted) return;
     setState(() {
       _scanning = true;
       _checked = 0;
-      _status = 'Reading photo GPS metadata on this device…';
+      _status = gpsPermissionGranted
+          ? 'Reading photo GPS metadata on this device…'
+          : 'Location metadata permission was not granted. Scanning accessible GPS tags anyway…';
     });
     final roots = <Directory>[];
     final seenRoots = <String>{};
@@ -236,7 +249,7 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
             )),
             const Padding(
               padding: EdgeInsets.all(10),
-              child: Text('Map tiles are loaded from OpenStreetMap. Exact coordinates remain in this app; place-name lookup is not enabled.',
+              child: Text('Map tiles © OpenStreetMap contributors. Exact coordinates remain in this app; place-name lookup is optional.',
                 textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: Colors.white60)),
             ),
           ]),
