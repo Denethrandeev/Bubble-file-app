@@ -1188,54 +1188,130 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
     );
   }
 
+  String _mediaTime(Duration value) {
+    final minutes = value.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = value.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final hours = value.inHours;
+    return hours > 0 ? '${hours.toString().padLeft(2, '0')}:$minutes:$seconds' : '$minutes:$seconds';
+  }
+
   Future<void> _playAudioFile(File file) async {
+    var volume = 1.0;
     try {
       await _mediaAudioPlayer.stop();
       await _mediaAudioPlayer.setSourceDeviceFile(file.path);
+      await _mediaAudioPlayer.setVolume(volume);
       await _mediaAudioPlayer.resume();
       if (!mounted) return;
       await showModalBottomSheet<void>(
         context: context,
+        isScrollControlled: true,
         backgroundColor: const Color(0xFF102B38),
-        builder: (sheetContext) => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(22),
-            child: StreamBuilder<PlayerState>(
-              stream: _mediaAudioPlayer.onPlayerStateChanged,
-              initialData: PlayerState.playing,
-              builder: (context, snapshot) {
-                final playing = snapshot.data == PlayerState.playing;
-                return Column(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.graphic_eq_rounded, color: _accent, size: 44),
-                  const SizedBox(height: 10),
-                  Text(_nameOf(file), maxLines: 2, textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 14),
-                  Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    IconButton(
-                      iconSize: 38,
-                      onPressed: () async {
-                        if (playing) {
-                          await _mediaAudioPlayer.pause();
-                        } else {
-                          await _mediaAudioPlayer.resume();
-                        }
+        builder: (sheetContext) => StatefulBuilder(
+          builder: (context, setSheetState) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22, 22, 22, 28),
+              child: StreamBuilder<PlayerState>(
+                stream: _mediaAudioPlayer.onPlayerStateChanged,
+                initialData: PlayerState.playing,
+                builder: (context, stateSnapshot) {
+                  final playing = stateSnapshot.data == PlayerState.playing;
+                  return Column(mainAxisSize: MainAxisSize.min, children: [
+                    Icon(Icons.graphic_eq_rounded, color: _accent, size: 44),
+                    const SizedBox(height: 10),
+                    Text(_nameOf(file), maxLines: 2, textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 14),
+                    StreamBuilder<Duration>(
+                      stream: _mediaAudioPlayer.onDurationChanged,
+                      initialData: Duration.zero,
+                      builder: (context, durationSnapshot) {
+                        final duration = durationSnapshot.data ?? Duration.zero;
+                        return StreamBuilder<Duration>(
+                          stream: _mediaAudioPlayer.onPositionChanged,
+                          initialData: Duration.zero,
+                          builder: (context, positionSnapshot) {
+                            final position = positionSnapshot.data ?? Duration.zero;
+                            final maxMs = math.max(1, duration.inMilliseconds);
+                            final currentMs = position.inMilliseconds.clamp(0, maxMs);
+                            return Column(children: [
+                              Slider(
+                                value: currentMs.toDouble(),
+                                min: 0,
+                                max: maxMs.toDouble(),
+                                activeColor: _accent,
+                                onChanged: duration <= Duration.zero ? null : (value) {
+                                  unawaited(_mediaAudioPlayer.seek(
+                                    Duration(milliseconds: value.round())));
+                                },
+                              ),
+                              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                                Text(_mediaTime(position), style: const TextStyle(fontSize: 11, color: Colors.white60)),
+                                Text(_mediaTime(duration), style: const TextStyle(fontSize: 11, color: Colors.white60)),
+                              ]),
+                            ]);
+                          },
+                        );
                       },
-                      icon: Icon(playing ? Icons.pause_circle : Icons.play_circle,
-                        color: _accent),
                     ),
-                    IconButton(
-                      iconSize: 30,
-                      onPressed: () async {
-                        await _mediaAudioPlayer.stop();
-                        if (sheetContext.mounted) Navigator.pop(sheetContext);
-                      },
-                      icon: const Icon(Icons.stop_circle_outlined),
-                    ),
-                  ]),
-                ]);
-              },
+                    Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      IconButton(
+                        tooltip: 'Back 10 seconds',
+                        onPressed: () async {
+                          final position = await _mediaAudioPlayer.getCurrentPosition() ?? Duration.zero;
+                          final target = position - const Duration(seconds: 10);
+                          await _mediaAudioPlayer.seek(target.isNegative ? Duration.zero : target);
+                        },
+                        icon: const Icon(Icons.replay_10_rounded),
+                      ),
+                      IconButton(
+                        iconSize: 42,
+                        onPressed: () async {
+                          if (playing) {
+                            await _mediaAudioPlayer.pause();
+                          } else {
+                            await _mediaAudioPlayer.resume();
+                          }
+                        },
+                        icon: Icon(playing ? Icons.pause_circle : Icons.play_circle, color: _accent),
+                      ),
+                      IconButton(
+                        tooltip: 'Forward 10 seconds',
+                        onPressed: () async {
+                          final position = await _mediaAudioPlayer.getCurrentPosition() ?? Duration.zero;
+                          final duration = await _mediaAudioPlayer.getDuration() ?? position;
+                          final target = position + const Duration(seconds: 10);
+                          await _mediaAudioPlayer.seek(target > duration ? duration : target);
+                        },
+                        icon: const Icon(Icons.forward_10_rounded),
+                      ),
+                      IconButton(
+                        tooltip: 'Stop playback',
+                        onPressed: () async {
+                          await _mediaAudioPlayer.stop();
+                          if (sheetContext.mounted) Navigator.pop(sheetContext);
+                        },
+                        icon: const Icon(Icons.stop_circle_outlined),
+                      ),
+                    ]),
+                    Row(children: [
+                      const Icon(Icons.volume_down_rounded, size: 18),
+                      Expanded(child: Slider(
+                        value: volume,
+                        min: 0,
+                        max: 1,
+                        activeColor: _accent,
+                        onChanged: (value) {
+                          setSheetState(() => volume = value);
+                          unawaited(_mediaAudioPlayer.setVolume(value));
+                        },
+                      )),
+                      const Icon(Icons.volume_up_rounded, size: 18),
+                    ]),
+                  ]);
+                },
+              ),
             ),
           ),
         ),
@@ -1247,8 +1323,18 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
 
   Future<void> _playVideoFile(File file) async {
     final controller = VideoPlayerController.file(file);
+    var volume = 1.0;
+    String formatTime(Duration value) {
+      final minutes = value.inMinutes.remainder(60).toString().padLeft(2, '0');
+      final seconds = value.inSeconds.remainder(60).toString().padLeft(2, '0');
+      return value.inHours > 0
+          ? '${value.inHours.toString().padLeft(2, '0')}:$minutes:$seconds'
+          : '$minutes:$seconds';
+    }
+
     try {
       await controller.initialize();
+      await controller.setVolume(volume);
       if (!mounted) {
         await controller.dispose();
         return;
@@ -1256,26 +1342,100 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       await controller.play();
       await showDialog<void>(
         context: context,
-        builder: (dialogContext) => AlertDialog(
-          backgroundColor: const Color(0xFF102B38),
-          title: Text(_nameOf(file), maxLines: 1, overflow: TextOverflow.ellipsis),
-          content: AspectRatio(
-            aspectRatio: controller.value.aspectRatio > 0
-                ? controller.value.aspectRatio : 16 / 9,
-            child: VideoPlayer(controller),
-          ),
-          actions: [
-            ValueListenableBuilder<VideoPlayerValue>(
-              valueListenable: controller,
-              builder: (context, value, _) => TextButton.icon(
-                onPressed: () => value.isPlaying ? controller.pause() : controller.play(),
-                icon: Icon(value.isPlaying ? Icons.pause : Icons.play_arrow),
-                label: Text(value.isPlaying ? 'Pause' : 'Play'),
+        builder: (dialogContext) => Dialog.fullscreen(
+          backgroundColor: Colors.black,
+          child: StatefulBuilder(
+            builder: (context, setSheetState) => Scaffold(
+              backgroundColor: Colors.black,
+              appBar: AppBar(
+                backgroundColor: Colors.black,
+                foregroundColor: Colors.white,
+                title: Text(_nameOf(file), maxLines: 1, overflow: TextOverflow.ellipsis),
+                actions: [
+                  IconButton(
+                    tooltip: 'Close video',
+                    onPressed: () => Navigator.pop(dialogContext),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              body: SafeArea(
+                child: ValueListenableBuilder<VideoPlayerValue>(
+                  valueListenable: controller,
+                  builder: (context, value, _) {
+                    final durationMs = math.max(1, value.duration.inMilliseconds);
+                    final positionMs = value.position.inMilliseconds.clamp(0, durationMs);
+                    return Column(children: [
+                      Expanded(
+                        child: Center(
+                          child: AspectRatio(
+                            aspectRatio: value.aspectRatio > 0 ? value.aspectRatio : 16 / 9,
+                            child: VideoPlayer(controller),
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                        child: Column(children: [
+                          Slider(
+                            value: positionMs.toDouble(),
+                            min: 0,
+                            max: durationMs.toDouble(),
+                            activeColor: _accent,
+                            onChanged: value.isInitialized ? (v) {
+                              unawaited(controller.seekTo(Duration(milliseconds: v.round())));
+                            } : null,
+                          ),
+                          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                            Text(formatTime(value.position), style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                            Text(formatTime(value.duration), style: const TextStyle(color: Colors.white70, fontSize: 11)),
+                          ]),
+                          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            IconButton(
+                              tooltip: 'Back 10 seconds',
+                              onPressed: () {
+                                final target = value.position - const Duration(seconds: 10);
+                                unawaited(controller.seekTo(target.isNegative ? Duration.zero : target));
+                              },
+                              icon: const Icon(Icons.replay_10_rounded, color: Colors.white),
+                            ),
+                            IconButton(
+                              iconSize: 42,
+                              onPressed: () => value.isPlaying ? controller.pause() : controller.play(),
+                              icon: Icon(value.isPlaying ? Icons.pause_circle : Icons.play_circle,
+                                color: _accent),
+                            ),
+                            IconButton(
+                              tooltip: 'Forward 10 seconds',
+                              onPressed: () {
+                                final target = value.position + const Duration(seconds: 10);
+                                unawaited(controller.seekTo(target > value.duration ? value.duration : target));
+                              },
+                              icon: const Icon(Icons.forward_10_rounded, color: Colors.white),
+                            ),
+                          ]),
+                          Row(children: [
+                            const Icon(Icons.volume_down_rounded, color: Colors.white70, size: 18),
+                            Expanded(child: Slider(
+                              value: volume,
+                              min: 0,
+                              max: 1,
+                              activeColor: _accent,
+                              onChanged: (v) {
+                                setSheetState(() => volume = v);
+                                unawaited(controller.setVolume(v));
+                              },
+                            )),
+                            const Icon(Icons.volume_up_rounded, color: Colors.white70, size: 18),
+                          ]),
+                        ]),
+                      ),
+                    ]);
+                  },
+                ),
               ),
             ),
-            TextButton(onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Close')),
-          ],
+          ),
         ),
       );
     } catch (e) {
@@ -1284,7 +1444,6 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       await controller.dispose();
     }
   }
-
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
