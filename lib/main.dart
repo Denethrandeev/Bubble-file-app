@@ -32,6 +32,58 @@ const List<Color> aquaAccents = <Color>[
 ];
 
 
+class _GlassWaterPainter extends CustomPainter {
+  _GlassWaterPainter({required Animation<double> phase, required this.accent, required this.tilt, required this.light})
+      : _phase = phase, super(repaint: phase);
+  final Animation<double> _phase;
+  final Color accent;
+  final Offset tilt;
+  final bool light;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final t = _phase.value * math.pi * 2;
+    final baseY = size.height * .84 + tilt.dy.clamp(-1.0, 1.0) * 2.2;
+    final amplitude = math.min(3.2, size.height * .018);
+    double surface(double u) => baseY
+        + math.sin(u * math.pi * 2 + t) * amplitude
+        + math.sin(u * math.pi * 4 - t * .68) * amplitude * .26
+        + tilt.dx.clamp(-1.0, 1.0) * (u - .5) * 3.0;
+
+    final water = Path()..moveTo(0, size.height);
+    for (var i = 0; i <= 56; i++) {
+      final u = i / 56;
+      water.lineTo(size.width * u, surface(u));
+    }
+    water..lineTo(size.width, size.height)..close();
+    canvas.drawPath(water, Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+        colors: [accent.withOpacity(light ? .035 : .075), accent.withOpacity(light ? .075 : .13), accent.withOpacity(light ? .10 : .18)],
+      ).createShader(Offset.zero & size));
+
+    final crest = Path();
+    for (var i = 0; i <= 56; i++) {
+      final u = i / 56;
+      final point = Offset(size.width * u, surface(u));
+      if (i == 0) { crest.moveTo(point.dx, point.dy); } else { crest.lineTo(point.dx, point.dy); }
+    }
+    canvas.drawPath(crest, Paint()
+      ..color = accent.withOpacity(light ? .20 : .34)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0
+      ..strokeCap = StrokeCap.round);
+    final glintX = (math.sin(t * .42) * .5 + .5) * size.width;
+    canvas.drawCircle(Offset(glintX, baseY + 5), 1.4,
+      Paint()..color = Colors.white.withOpacity(light ? .18 : .28));
+  }
+
+  @override
+  bool shouldRepaint(covariant _GlassWaterPainter oldDelegate) =>
+      oldDelegate.accent != accent || oldDelegate.tilt != tilt || oldDelegate.light != light;
+}
+
 class _AnimatedStorageDrop extends StatefulWidget {
   const _AnimatedStorageDrop({
     required this.fraction,
@@ -236,7 +288,7 @@ class AquaApp extends StatefulWidget {
   State<AquaApp> createState() => _AquaAppState();
 }
 
-class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
+class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   int _tab = 0;
   int _theme = 0;
   bool _gravity = true;
@@ -276,6 +328,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   List<String> _storageRoots = <String>['/storage/emulated/0'];
   static const FlutterSecureStorage _folderPinStore = FlutterSecureStorage();
   final AudioPlayer _mediaAudioPlayer = AudioPlayer();
+  late final AnimationController _cardWaterMotion;
 
   Color get _accent => aquaAccents[_theme];
 
@@ -286,6 +339,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _cardWaterMotion = AnimationController(vsync: this, duration: const Duration(milliseconds: 6200))..repeat();
     _waterSensor = accelerometerEventStream().listen((event) {
       _waterBaseline ??= Offset(event.x, event.y);
       final next = Offset(
@@ -1591,6 +1645,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
     _waterSensor?.cancel();
     _recycleTimer?.cancel();
     _mediaAudioPlayer.dispose();
+    _cardWaterMotion.dispose();
     super.dispose();
   }
 
@@ -2134,11 +2189,17 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       borderRadius: BorderRadius.circular(17),
       border: Border.all(color: _light ? const Color(0xFFE4E8EC) : const Color(0xFF2A3742)),
     ),
-    child: Material(
-      color: Colors.transparent,
+    child: ClipRRect(
       borderRadius: BorderRadius.circular(17),
-      clipBehavior: Clip.antiAlias,
-      child: child,
+      child: Stack(children: [
+        if (_waterEnabled)
+          Positioned.fill(child: IgnorePointer(child: RepaintBoundary(
+            child: CustomPaint(painter: _GlassWaterPainter(
+              phase: _cardWaterMotion, accent: _accent, tilt: _waterTilt, light: _light,
+            )),
+          ))),
+        Material(color: Colors.transparent, child: child),
+      ]),
     ),
   );
 
