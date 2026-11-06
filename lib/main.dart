@@ -1966,7 +1966,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
         'Bubble File Manager • Development build\n'
         'Includes storage browsing, file operations, bubble physics, two-stage Recycle Bin, hidden files and SHA-256 duplicate scanning. '
         'Advanced Tools add encrypted Vault, ZIP, selected-photo GPS maps, removable-storage file import and cleanup suggestions. '
-        'Automatic face similarity albums still require a bundled offline embedding model and validation on real devices.',
+        'Face Similarity Albums use an on-device face detection and embedding model to group visually similar faces; review matches because errors are possible.',
         style: TextStyle(fontSize: 11, color: Colors.white60, height: 1.55))),
     ],
   );
