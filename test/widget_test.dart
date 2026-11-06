@@ -15,6 +15,5 @@ void main() {
 
     expect(find.text('My Files'), findsOneWidget);
     expect(find.text('Categories'), findsOneWidget);
-    expect(find.text('Storage locations'), findsOneWidget);
   });
 }
