@@ -739,7 +739,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
           child: Text(_performanceSummary, style: const TextStyle(color: Colors.white70, fontSize: 11))),
       ],
       _toolCard('Import from SD card / USB', 'Use Android system picker to select files from removable storage', Icons.usb, _importExternal),
-      _toolCard('Face Similarity / Person Albums', 'Find similar faces locally and review possible people groups', Icons.face_retouching_natural, () {
+      _toolCard('Face Albums (on-device)', 'Group visually similar faces locally; review every suggested match', Icons.face_retouching_natural, () {
         Navigator.of(context).push(MaterialPageRoute<void>(
           builder: (_) => FaceAlbumsPage(
             targetDirectory: widget.targetDirectory,
