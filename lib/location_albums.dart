@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:exif/exif.dart';
@@ -19,6 +20,8 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
   int _checked = 0;
   String _status = 'Scan photos to find locations saved in their GPS metadata.';
   List<_LocatedPhoto> _photos = <_LocatedPhoto>[];
+  final Map<String, String> _placeNames = <String, String>{};
+  bool _lookingUpPlaces = false;
 
   Map<String, List<_LocatedPhoto>> get _groups {
     final result = <String, List<_LocatedPhoto>>{};
@@ -28,6 +31,87 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
       (result[key] ??= <_LocatedPhoto>[]).add(photo);
     }
     return result;
+  }
+
+  Future<void> _lookupPlaceNames() async {
+    if (_groups.isEmpty || _lookingUpPlaces) return;
+    final allowed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Find readable place names?'),
+        content: const Text(
+          'To show names such as town or city, this will send the rounded GPS coordinates of each location group to OpenStreetMap Nominatim. It will not upload your photos. Allow up to 30 location lookups, with a short delay between requests?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Not now')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Allow lookup')),
+        ],
+      ),
+    );
+    if (allowed != true || !mounted) return;
+    setState(() {
+      _lookingUpPlaces = true;
+      _status = 'Looking up place names online…';
+    });
+    final client = HttpClient()..userAgent = 'BubbleFileManager/0.2.0 (GPS photo location labels)';
+    var completed = 0;
+    try {
+      final groups = _groups.entries.toList();
+      for (final entry in groups.take(30)) {
+        if (_placeNames.containsKey(entry.key)) continue;
+        final photo = entry.value.first;
+        final uri = Uri.https('nominatim.openstreetmap.org', '/reverse', {
+          'format': 'jsonv2',
+          'lat': photo.latitude.toStringAsFixed(5),
+          'lon': photo.longitude.toStringAsFixed(5),
+          'zoom': '14',
+          'addressdetails': '1',
+        });
+        try {
+          final request = await client.getUrl(uri);
+          request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+          final response = await request.close().timeout(const Duration(seconds: 12));
+          final body = await response.transform(utf8.decoder).join();
+          if (response.statusCode == HttpStatus.ok) {
+            final decoded = jsonDecode(body);
+            if (decoded is Map<String, dynamic>) {
+              final address = decoded['address'];
+              String? shortName;
+              if (address is Map) {
+                shortName = (address['city'] ?? address['town'] ?? address['village'] ??
+                    address['municipality'] ?? address['suburb'] ?? address['county'])?.toString();
+                final country = address['country']?.toString();
+                if (shortName != null && country != null && country.isNotEmpty) {
+                  shortName = '$shortName, $country';
+                }
+              }
+              final label = shortName ?? decoded['display_name']?.toString();
+              if (label != null && label.trim().isNotEmpty) {
+                _placeNames[entry.key] = label;
+              }
+            }
+          }
+        } catch (_) {
+          // Keep coordinate labels if the service is unavailable.
+        }
+        completed++;
+        if (mounted) {
+          setState(() => _status = 'Resolved $completed of ${groups.length < 30 ? groups.length : 30} place names…');
+        }
+        // Public Nominatim service policy: do not send requests faster than 1/sec.
+        await Future<void>.delayed(const Duration(milliseconds: 1100));
+      }
+    } finally {
+      client.close(force: true);
+      if (mounted) {
+        setState(() {
+          _lookingUpPlaces = false;
+          _status = 'Place-name lookup finished. Unresolved groups still show their GPS coordinates.';
+        });
+      }
+    }
   }
 
   double? _coordinate(String? raw, String reference) {
@@ -215,6 +299,11 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
           Text('PLACES FOUND • ${_groups.length}', style: const TextStyle(
             letterSpacing: 1.4, color: Colors.white70, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _lookingUpPlaces ? null : _lookupPlaceNames,
+            icon: const Icon(Icons.public),
+            label: Text(_lookingUpPlaces ? 'Finding place names…' : 'Find place names online (optional)'),
+          ),
           ..._groups.entries.map((entry) {
             final photos = entry.value;
             final first = photos.first;
@@ -222,8 +311,8 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
               color: const Color(0xFF12313F),
               child: ExpansionTile(
                 leading: Icon(Icons.place_rounded, color: widget.accent),
-                title: Text('Location group • ${photos.length} photo(s)'),
-                subtitle: Text(entry.key, style: const TextStyle(color: Colors.white60)),
+                title: Text(_placeNames[entry.key] ?? 'Location group • ${photos.length} photo(s)'),
+                subtitle: Text('${_placeNames.containsKey(entry.key) ? entry.key + ' • ' : ''}${photos.length} photo(s)', style: const TextStyle(color: Colors.white60)),
                 trailing: IconButton(
                   tooltip: 'Show this group on map',
                   onPressed: () => _showMap(first, photos),
