@@ -156,7 +156,10 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
       if (mounted) {
         setState(() => _status = 'Preparing offline face model…');
       }
-      detector = await face_ml.FaceDetector.create();
+      detector = await face_ml.FaceDetector.create(
+        model: face_ml.FaceDetectionModel.backCamera,
+        minFaceSize: 0.04,
+      );
       final clusters = <_PersonCluster>[];
 
       for (var index = 0; index < images.length; index++) {
@@ -409,19 +412,19 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
     return Scaffold(
       backgroundColor: const Color(0xFF071E2A),
       appBar: AppBar(
-        title: const Text('Face Similarity Albums'),
+        title: const Text('Face Albums'),
         backgroundColor: Colors.transparent,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           const Text(
-            'Private on-device people albums',
+            'On-device Face Albums',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 6),
           const Text(
-            'The app compares face features locally. It does not name people, upload photos, or save face templates. Similarity groups are temporary and disappear when you leave this screen.',
+            'The app detects faces and compares temporary similarity features on this phone. It does not name people or upload photos. Suggested groups can be wrong, so review them manually. Temporary face features are discarded when you leave this screen.',
             style: TextStyle(color: Colors.white70, fontSize: 12),
           ),
           const SizedBox(height: 14),
