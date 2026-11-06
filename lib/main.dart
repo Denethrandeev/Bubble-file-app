@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'advanced_tools.dart';
+import 'face_albums.dart';
 import 'media_thumbnail.dart';
 import 'location_albums.dart';
 import 'package:audioplayers/audioplayers.dart';
