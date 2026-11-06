@@ -901,7 +901,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver, SingleTi
   Future<void> _searchAllStorage() async {
     final query = _search.trim().toLowerCase();
     if (query.isEmpty || !_hasStorage || _globalSearchBusy) return;
-    final terms = query.split(RegExp(r'\\s+')).where((term) => term.isNotEmpty).toList();
+    final terms = query.split(RegExp(r'\s+')).where((term) => term.isNotEmpty).toList();
     setState(() {
       _globalSearchActive = true;
       _globalSearchBusy = true;
