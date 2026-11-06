@@ -31,57 +31,6 @@ const List<Color> aquaAccents = <Color>[
 ];
 
 
-class _LiquidSurfacePainter extends CustomPainter {
-  const _LiquidSurfacePainter({required this.accent, required this.tilt, required this.enabled});
-  final Color accent;
-  final Offset tilt;
-  final bool enabled;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (size.isEmpty || !enabled) return;
-    final slope = enabled ? (tilt.dx * .12).clamp(-.13, .13) : 0.0;
-    final base = size.height * .91;
-    final path = Path()..moveTo(0, base + slope * size.height);
-    for (var i = 0; i <= 24; i++) {
-      final x = size.width * i / 24;
-      final wave = math.sin(i / 24 * math.pi * 2) * size.height * .009;
-      path.lineTo(x, base + slope * (x - size.width / 2) + wave);
-    }
-    path
-      ..lineTo(size.width, size.height)
-      ..lineTo(0, size.height)
-      ..close();
-    canvas.drawPath(path, Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [accent.withOpacity(.16), accent.withOpacity(.30)],
-      ).createShader(Offset.zero & size));
-    final shine = Paint()
-      ..color = accent.withOpacity(.52)
-      ..strokeWidth = 1.1
-      ..style = PaintingStyle.stroke;
-    final surface = Path()..moveTo(0, base + slope * size.height);
-    for (var i = 0; i <= 24; i++) {
-      final x = size.width * i / 24;
-      final wave = math.sin(i / 24 * math.pi * 2) * size.height * .009;
-      surface.lineTo(x, base + slope * (x - size.width / 2) + wave);
-    }
-    canvas.drawPath(surface, shine);
-    for (var i = 0; i < 2; i++) {
-      final x = size.width * (.28 + i * .43) + (enabled ? tilt.dx * 3 : 0);
-      final y = size.height * (.955 - i * .018) + (enabled ? tilt.dy * 2 : 0);
-      canvas.drawCircle(Offset(x, y), size.width * (.009 + i * .003),
-        Paint()..color = Colors.white.withOpacity(.36));
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _LiquidSurfacePainter old) =>
-      old.accent != accent || old.tilt != tilt || old.enabled != enabled;
-}
-
 class _StorageDropPainter extends CustomPainter {
   const _StorageDropPainter({
     required this.fraction,
