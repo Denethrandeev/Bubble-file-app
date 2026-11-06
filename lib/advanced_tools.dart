@@ -8,7 +8,6 @@ import 'face_albums.dart';
 import 'location_albums.dart';
 import 'package:cryptography/cryptography.dart';
 import 'package:crypto/crypto.dart' as hashes;
-import 'package:exif/exif.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
