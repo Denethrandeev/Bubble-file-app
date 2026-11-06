@@ -19,20 +19,22 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import re
           path = Path("android/app/src/main/AndroidManifest.xml")
           data = path.read_text(encoding="utf-8")
-          # Match the application element even when attributes are multiline.
-          match = re.search(r'<application(?=[\\s>])[^>]*>', data, flags=re.IGNORECASE | re.DOTALL)
-          if match is None:
+          start = data.lower().find("<application")
+          if start < 0:
               raise SystemExit("AndroidManifest.xml has no <application> element")
-          tag = match.group(0)
-          label_pattern = r'\\bandroid:label\\s*=\\s*("[^"]*"|\\'[^\\']*\\')'
-          if re.search(label_pattern, tag):
-              updated = re.sub(label_pattern, 'android:label="Bubble File Manager"', tag, count=1)
+          end = data.find(">", start)
+          if end < 0:
+              raise SystemExit("Malformed <application> element")
+          tag = data[start:end + 1]
+          marker = 'android:label='
+          if marker in tag:
+              import re
+              tag = re.sub(r'android:label="[^"]*"', 'android:label="Bubble File Manager"', tag, count=1)
           else:
-              updated = tag[:-1] + ' android:label="Bubble File Manager">'
-          data = data[:match.start()] + updated + data[match.end():]
+              tag = tag[:-1] + ' android:label="Bubble File Manager">'
+          data = data[:start] + tag + data[end + 1:]
           path.write_text(data, encoding="utf-8")
           PY
       - name: Add Android storage permissions
