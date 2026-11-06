@@ -4,7 +4,6 @@ import 'dart:math' as math;
 
 import 'package:face_detection_tflite/face_detection_tflite.dart' as face_ml;
 import 'package:flutter/material.dart';
-import 'package:open_filex/open_filex.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 /// On-device, temporary face-similarity albums.
@@ -157,7 +156,10 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
       if (mounted) {
         setState(() => _status = 'Preparing offline face model…');
       }
-      detector = await face_ml.FaceDetector.create();
+      detector = await face_ml.FaceDetector.create(
+        model: face_ml.FaceDetectionModel.backCamera,
+        minFaceSize: 0.04,
+      );
       final clusters = <_PersonCluster>[];
 
       for (var index = 0; index < images.length; index++) {
@@ -171,7 +173,8 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
           final bytes = await file.readAsBytes();
           final faces = await detector.detectFacesFromBytes(
             bytes,
-            mode: face_ml.FaceDetectionMode.standard,
+            // Full mode provides the eye alignment expected by the embedding model.
+            mode: face_ml.FaceDetectionMode.full,
           );
 
           for (final face in faces.take(5)) {
@@ -283,6 +286,43 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
     setState(() {});
   }
 
+  Future<void> _viewPhoto(String path) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Dialog.fullscreen(
+        backgroundColor: const Color(0xFF050B12),
+        child: Scaffold(
+          backgroundColor: const Color(0xFF050B12),
+          appBar: AppBar(
+            backgroundColor: const Color(0xFF050B12),
+            foregroundColor: Colors.white,
+            title: Text(path.split(Platform.pathSeparator).last,
+              maxLines: 1, overflow: TextOverflow.ellipsis),
+            actions: [
+              IconButton(
+                tooltip: 'Close image',
+                onPressed: () => Navigator.pop(dialogContext),
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              minScale: .8,
+              maxScale: 6,
+              child: Image.file(
+                File(path),
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.broken_image_outlined, color: Colors.white70, size: 56),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showGroup(_PersonCluster group, int index) {
     showModalBottomSheet<void>(
       context: context,
@@ -325,7 +365,7 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
                       fit: StackFit.expand,
                       children: [
                         InkWell(
-                          onTap: () => OpenFilex.open(path),
+                          onTap: () => _viewPhoto(path),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(12),
                             child: Image.file(
@@ -372,19 +412,19 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
     return Scaffold(
       backgroundColor: const Color(0xFF071E2A),
       appBar: AppBar(
-        title: const Text('Face Similarity Albums'),
+        title: const Text('Face Albums'),
         backgroundColor: Colors.transparent,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           const Text(
-            'Private on-device people albums',
+            'On-device Face Albums',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 6),
           const Text(
-            'The app compares face features locally. It does not name people, upload photos, or save face templates. Similarity groups are temporary and disappear when you leave this screen.',
+            'The app detects faces and compares temporary similarity features on this phone. It does not name people or upload photos. Suggested groups can be wrong, so review them manually. Temporary face features are discarded when you leave this screen.',
             style: TextStyle(color: Colors.white70, fontSize: 12),
           ),
           const SizedBox(height: 14),

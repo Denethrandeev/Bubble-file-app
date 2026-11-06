@@ -85,6 +85,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
     return '$salt:$digest';
   }
 
+
   Future<bool> _verifyPin({bool setup = false}) async {
     final pinController = TextEditingController();
     final confirmController = TextEditingController();
@@ -356,7 +357,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
             const SizedBox(height: 8),
             const Text('Files are stored encrypted with AES-256-GCM.', style: TextStyle(color: Colors.white70)),
             const SizedBox(height: 12),
-            FilledButton.icon(onPressed: () async { Navigator.pop(context); await _addToVault(); },
+            FilledButton.icon(onPressed: () async { Navigator.pop(context); await _addToVault(alreadyUnlocked: true); },
               icon: const Icon(Icons.add), label: const Text('Encrypt a file into Vault')),
             OutlinedButton.icon(
               onPressed: _busy ? null : _changePin,
@@ -370,7 +371,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
                   title: Text(file.uri.pathSegments.last, maxLines: 1, overflow: TextOverflow.ellipsis),
                   trailing: IconButton(icon: const Icon(Icons.save_alt), onPressed: () async {
                     Navigator.pop(context);
-                    await _exportFromVault(file);
+                    await _exportFromVault(file, alreadyUnlocked: true);
                   }),
                 )).toList())),
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
@@ -385,8 +386,8 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
     if (mounted) setState(() => _vaultFiles = files);
   }
 
-  Future<void> _addToVault() async {
-    if (!await _unlockVault()) return;
+  Future<void> _addToVault({bool alreadyUnlocked = false}) async {
+    if (!alreadyUnlocked && !await _unlockVault()) return;
     final picked = await FilePicker.platform.pickFiles(withData: false);
     final path = picked?.files.single.path;
     if (path == null) return;
@@ -415,8 +416,8 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
     }
   }
 
-  Future<void> _exportFromVault(File encryptedFile) async {
-    if (!await _unlockVault()) return;
+  Future<void> _exportFromVault(File encryptedFile, {bool alreadyUnlocked = false}) async {
+    if (!alreadyUnlocked && !await _unlockVault()) return;
     final destination = await FilePicker.platform.getDirectoryPath();
     if (destination == null) return;
     try {
@@ -679,6 +680,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
       if (_busy) const LinearProgressIndicator(),
       Text(_status, style: const TextStyle(color: Colors.white70)),
       const SizedBox(height: 12),
+      _toolCard('Secret Vault', 'Open the encrypted Vault, create or unlock it with your PIN, and manage protected files', Icons.lock, _openVault),
       _toolCard('Create ZIP', 'Compress selected files into one archive', Icons.archive, _createZip),
       _toolCard('Extract ZIP', 'Extract an archive with path-traversal checks', Icons.unarchive, _extractZip),
       _toolCard('Location Albums', 'Group phone photos by embedded GPS location and view them on a map', Icons.location_on, () {
@@ -737,7 +739,7 @@ class _AquaAdvancedToolsState extends State<AquaAdvancedTools> {
           child: Text(_performanceSummary, style: const TextStyle(color: Colors.white70, fontSize: 11))),
       ],
       _toolCard('Import from SD card / USB', 'Use Android system picker to select files from removable storage', Icons.usb, _importExternal),
-      _toolCard('Face Similarity / Person Albums', 'Find similar faces locally and review possible people groups', Icons.face_retouching_natural, () {
+      _toolCard('Face Albums (on-device)', 'Group visually similar faces locally; review every suggested match', Icons.face_retouching_natural, () {
         Navigator.of(context).push(MaterialPageRoute<void>(
           builder: (_) => FaceAlbumsPage(
             targetDirectory: widget.targetDirectory,

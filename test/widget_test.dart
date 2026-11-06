@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:bubble_file_manager/main.dart';
 
 void main() {
-  testWidgets('Bubble File Manager shows splash then opens home', (tester) async {
+  testWidgets('Bubble File Manager shows splash then opens My Files home', (tester) async {
     await tester.pumpWidget(const AquaApp());
 
     expect(find.text('BUBBLE'), findsOneWidget);
@@ -13,6 +13,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 3300));
     await tester.pump();
 
-    expect(find.text('Your space,'), findsOneWidget);
+    expect(find.text('My Files'), findsOneWidget);
+    expect(find.text('Categories'), findsOneWidget);
   });
 }
