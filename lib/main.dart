@@ -1105,6 +1105,11 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       return;
     }
     final ext = _extensionOf(entity);
+    const images = <String>{'jpg','jpeg','png','gif','webp','bmp','heic','heif','tif','tiff'};
+    if (images.contains(ext)) {
+      await _viewImageFile(entity);
+      return;
+    }
     const audio = <String>{'mp3','wav','m4a','aac','flac','ogg','opus','wma'};
     const video = <String>{'mp4','mkv','mov','webm','3gp','avi','m4v'};
     if (audio.contains(ext)) {
@@ -1127,6 +1132,60 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       _message('Could not open file: $e');
       await _showDetails(entity);
     }
+  }
+
+  Future<void> _viewImageFile(File file) async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => Dialog.fullscreen(
+        backgroundColor: const Color(0xFF050B12),
+        child: Scaffold(
+          backgroundColor: const Color(0xFF050B12),
+          appBar: AppBar(
+            backgroundColor: const Color(0xFF050B12),
+            foregroundColor: Colors.white,
+            title: Text(
+              file.uri.pathSegments.isEmpty ? 'Image' : file.uri.pathSegments.last,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            actions: [
+              IconButton(
+                tooltip: 'Close image',
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.of(dialogContext).pop(),
+              ),
+            ],
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              minScale: 0.8,
+              maxScale: 6.0,
+              child: Image.file(
+                file,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) => const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.broken_image_outlined, color: Colors.white70, size: 56),
+                      SizedBox(height: 12),
+                      Text(
+                        'This image could not be displayed.',
+                        style: TextStyle(color: Colors.white70),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _playAudioFile(File file) async {
