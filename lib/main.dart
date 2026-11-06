@@ -169,6 +169,10 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   bool _scanningDuplicates = false;
   String _fileCategory = 'All files';
   String _sortMode = 'Name';
+  String _viewMode = 'List';
+  bool _sortDescending = false;
+  bool _categoryScanBusy = false;
+  List<FileSystemEntity> _categoryFiles = <FileSystemEntity>[];
   Directory? _recycleDirectory;
   File? _recycleIndex;
   List<Map<String, dynamic>> _recycleRecords = <Map<String, dynamic>>[];
@@ -629,8 +633,60 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
     return dot < 0 ? '' : name.substring(dot + 1).toLowerCase();
   }
 
+  Future<void> _loadCategoryFiles(String category) async {
+    if (!_hasStorage) return;
+    setState(() {
+      _fileCategory = category;
+      _search = '';
+      _categoryScanBusy = true;
+      _categoryFiles = <FileSystemEntity>[];
+    });
+    final found = <FileSystemEntity>[];
+    final pending = <Directory>[];
+    final seen = <String>{};
+    for (final path in _storageRoots) {
+      if (await Directory(path).exists()) pending.add(Directory(path));
+    }
+    if (pending.isEmpty && await _root.exists()) pending.add(_root);
+    var visited = 0;
+    while (pending.isNotEmpty && visited < 20000) {
+      final directory = pending.removeLast();
+      final normalized = directory.path.toLowerCase();
+      if (!seen.add(normalized)) continue;
+      if (normalized.contains('/android/data') ||
+          normalized.contains('/android/obb') ||
+          normalized.contains('/.') ||
+          normalized.contains('/aqua_recycle_bin') ||
+          normalized.contains('/vault')) continue;
+      try {
+        await for (final entity in directory.list(followLinks: false)) {
+          visited++;
+          if (entity is Directory) {
+            final name = _nameOf(entity);
+            if (!name.startsWith('.') && !entity.path.toLowerCase().contains('/android/data') &&
+                !entity.path.toLowerCase().contains('/android/obb')) {
+              pending.add(entity);
+            }
+          } else if (entity is File && _matchesCategory(entity)) {
+            found.add(entity);
+          }
+          if (visited >= 20000) break;
+        }
+      } catch (_) {
+        // Ignore folders Android or the storage provider does not expose.
+      }
+    }
+    if (!mounted) return;
+    setState(() {
+      _categoryFiles = found;
+      _categoryScanBusy = false;
+      _tab = 1;
+    });
+  }
+
   bool _matchesCategory(FileSystemEntity item) {
-    if (item is Directory || _fileCategory == 'All files') return true;
+    if (_fileCategory == 'All files') return true;
+    if (item is Directory) return false;
     final ext = _extensionOf(item);
     switch (_fileCategory) {
       case 'Images':
@@ -651,30 +707,36 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   }
 
   List<FileSystemEntity> get _visibleItems {
-    final items = _items.where((item) =>
+    final source = _fileCategory == 'All files' ? _items : _categoryFiles;
+    final items = source.where((item) =>
       (_showHidden || !_nameOf(item).startsWith('.')) &&
       _nameOf(item).toLowerCase().contains(_search.toLowerCase()) &&
       _matchesCategory(item)).toList();
     items.sort((a, b) {
-      if (_foldersFirst && a is Directory != (b is Directory)) {
-        return a is Directory ? -1 : 1;
-      }
+      int result;
       switch (_sortMode) {
         case 'Size':
           int sizeOf(FileSystemEntity item) {
             try { return item is File ? item.lengthSync() : 0; } catch (_) { return 0; }
           }
-          return sizeOf(b).compareTo(sizeOf(a));
+          result = sizeOf(a).compareTo(sizeOf(b));
+          break;
         case 'Date':
           DateTime dateOf(FileSystemEntity item) {
             try { return item.statSync().modified; } catch (_) { return DateTime.fromMillisecondsSinceEpoch(0); }
           }
-          return dateOf(b).compareTo(dateOf(a));
+          result = dateOf(a).compareTo(dateOf(b));
+          break;
         case 'Type':
-          return _extensionOf(a).compareTo(_extensionOf(b));
+          result = _extensionOf(a).compareTo(_extensionOf(b));
+          break;
         default:
-          return _nameOf(a).toLowerCase().compareTo(_nameOf(b).toLowerCase());
+          result = _nameOf(a).toLowerCase().compareTo(_nameOf(b).toLowerCase());
       }
+      if (_fileCategory == 'All files' && _foldersFirst && a is Directory != (b is Directory)) {
+        result = a is Directory ? -1 : 1;
+      }
+      return _sortDescending ? -result : result;
     });
     return items;
   }
@@ -1331,11 +1393,14 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
 
   Widget _category(String title, IconData icon) => InkWell(
     borderRadius: BorderRadius.circular(20),
-    onTap: () => setState(() {
-      _fileCategory = title;
-      _search = '';
-      _tab = 1;
-    }),
+    onTap: () {
+      if (title == 'All files') {
+        setState(() { _fileCategory = title; _search = ''; _tab = 1; });
+        _loadDirectory(_root);
+      } else {
+        _loadCategoryFiles(title);
+      }
+    },
     child: _glass(child: Row(children: [
       Icon(icon, color: _accent, size: 25),
       const SizedBox(width: 10),
@@ -1402,10 +1467,26 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
                   PopupMenuItem(value: path, child: Text(path, maxLines: 1, overflow: TextOverflow.ellipsis))).toList(),
               ),
               PopupMenuButton<String>(
+                tooltip: 'File display method',
+                onSelected: (value) => setState(() => _viewMode = value),
+                itemBuilder: (context) => const [
+                  PopupMenuItem(value: 'List', child: Text('List view')),
+                  PopupMenuItem(value: 'Compact', child: Text('Compact view')),
+                  PopupMenuItem(value: 'Grid', child: Text('Grid view')),
+                  PopupMenuItem(value: 'Large thumbnails', child: Text('Large thumbnails')),
+                ],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+                  child: Icon(Icons.grid_view_rounded, color: _accent, size: 19),
+                ),
+              ),
+              PopupMenuButton<String>(
                 tooltip: 'Sort files',
                 onSelected: (value) => setState(() {
                   if (value == 'Folders first' || value == 'No folder priority') {
                     _foldersFirst = value == 'Folders first';
+                  } else if (value == 'Ascending' || value == 'Descending') {
+                    _sortDescending = value == 'Descending';
                   } else {
                     _sortMode = value;
                   }
@@ -1415,21 +1496,51 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
                   PopupMenuItem(value: 'Size', child: Text('Sort by size')),
                   PopupMenuItem(value: 'Date', child: Text('Sort by date')),
                   PopupMenuItem(value: 'Type', child: Text('Sort by type')),
+                  PopupMenuItem(value: 'Ascending', child: Text('Ascending')),
+                  PopupMenuItem(value: 'Descending', child: Text('Descending')),
                   PopupMenuDivider(),
                   PopupMenuItem(value: 'Folders first', child: Text('Folders first')),
                   PopupMenuItem(value: 'No folder priority', child: Text('No folder priority')),
                 ],
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  child: Text('Sort: $_sortMode', style: TextStyle(fontSize: 10, color: _accent)),
+                  child: Text('Sort: $_sortMode ${_sortDescending ? '↓' : '↑'}', style: TextStyle(fontSize: 10, color: _accent)),
                 ),
               ),
             ]),
           ]),
         )),
         const SizedBox(height: 8),
-        Expanded(child: visibleItems.isEmpty
-          ? const Center(child: Text('This folder is empty', style: TextStyle(color: Colors.white54)))
+        Expanded(child: _categoryScanBusy
+          ? const Center(child: CircularProgressIndicator())
+          : visibleItems.isEmpty
+          ? const Center(child: Text('No matching files found', style: TextStyle(color: Colors.white54)))
+          : _viewMode == 'Grid' || _viewMode == 'Large thumbnails'
+          ? GridView.builder(
+              padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: _viewMode == 'Large thumbnails' ? 2 : 3,
+                crossAxisSpacing: 9, mainAxisSpacing: 9,
+                childAspectRatio: _viewMode == 'Large thumbnails' ? .82 : .88,
+              ),
+              itemCount: visibleItems.length,
+              itemBuilder: (context, index) {
+                final item = visibleItems[index];
+                final isFolder = item is Directory;
+                return InkWell(
+                  onTap: () => _openEntity(item),
+                  borderRadius: BorderRadius.circular(17),
+                  child: _glass(child: Column(children: [
+                    Expanded(child: isFolder
+                      ? Icon(Icons.folder_rounded, color: _accent, size: 54)
+                      : MediaThumbnail(key: ValueKey(item.path), path: item.path, accent: _accent, size: _viewMode == 'Large thumbnails' ? 126 : 88)),
+                    Padding(padding: const EdgeInsets.fromLTRB(6, 5, 6, 7),
+                      child: Text(_nameOf(item), maxLines: 2, overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
+                  ])),
+                );
+              },
+            )
           : ListView.builder(
               padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
               itemCount: visibleItems.length,
@@ -1437,7 +1548,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
                 final item = visibleItems[index];
                 final isFolder = item is Directory;
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 7),
+                  padding: const EdgeInsets.only(bottom: _viewMode == 'Compact' ? 3 : 7),
                   child: _glass(child: Row(children: [
                     isFolder
                       ? Icon(Icons.folder_rounded, color: _accent, size: 25)
@@ -1445,9 +1556,9 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
                           key: ValueKey(item.path),
                           path: item.path,
                           accent: _accent,
-                          size: 50,
+                          size: _viewMode == 'Compact' ? 34 : 50,
                         ),
-                    const SizedBox(width: 11),
+                    SizedBox(width: _viewMode == 'Compact' ? 7 : 11),
                     Expanded(child: InkWell(
                       onTap: () => _openEntity(item),
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
