@@ -716,7 +716,12 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       _matchesCategory(item)).toList();
     items.sort((a, b) {
       int result;
-      switch (_sortMode) {
+      if (_fileCategory == 'Recent files') {
+        DateTime modified(FileSystemEntity item) {
+          try { return item.statSync().modified; } catch (_) { return DateTime.fromMillisecondsSinceEpoch(0); }
+        }
+        result = modified(b).compareTo(modified(a));
+      } else switch (_sortMode) {
         case 'Size':
           int sizeOf(FileSystemEntity item) {
             try { return item is File ? item.lengthSync() : 0; } catch (_) { return 0; }
