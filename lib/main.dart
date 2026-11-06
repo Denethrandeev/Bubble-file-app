@@ -45,83 +45,110 @@ class _StorageDropPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width * .5, size.height * .5);
-    final radius = math.min(size.width, size.height) * .39;
-    final orb = Rect.fromCircle(center: center, radius: radius);
-    final orbPath = Path()..addOval(orb);
+    // A classic water-drop silhouette: pointed at the top and rounded below.
+    final drop = Rect.fromLTWH(
+      size.width * .15, size.height * .035,
+      size.width * .70, size.height * .92,
+    );
+    final cx = drop.center.dx;
+    final top = drop.top;
+    final bottom = drop.bottom;
+    final left = drop.left;
+    final right = drop.right;
+    final h = drop.height;
+    final w = drop.width;
+    final dropPath = Path()
+      ..moveTo(cx, top)
+      ..cubicTo(cx + w * .10, top + h * .16, right, top + h * .22,
+          right, top + h * .43)
+      ..cubicTo(right, top + h * .73, cx + w * .30, bottom - h * .015,
+          cx, bottom)
+      ..cubicTo(cx - w * .30, bottom - h * .015, left, top + h * .73,
+          left, top + h * .43)
+      ..cubicTo(left, top + h * .22, cx - w * .10, top + h * .16,
+          cx, top)
+      ..close();
 
-    // Soft halo and translucent glass shell.
-    canvas.drawCircle(center, radius * 1.18,
-      Paint()..shader = RadialGradient(colors: [
-        color.withOpacity(.20), color.withOpacity(.055), Colors.transparent,
-      ]).createShader(Rect.fromCircle(center: center, radius: radius * 1.18)));
-    canvas.drawCircle(center, radius,
-      Paint()..shader = const RadialGradient(
-        center: Alignment(-.42, -.55),
-        radius: .95,
-        colors: [Color(0x66FFFFFF), Color(0x1AFFFFFF), Color(0x08000000)],
-        stops: [0, .38, 1],
-      ).createShader(orb));
+    final haloRect = drop.inflate(size.width * .12);
+    canvas.drawOval(haloRect, Paint()
+      ..shader = RadialGradient(colors: [
+        color.withOpacity(.22), color.withOpacity(.07), Colors.transparent,
+      ]).createShader(haloRect));
 
     canvas.save();
-    canvas.clipPath(orbPath);
+    canvas.clipPath(dropPath);
+
+    // Translucent glass body.
+    canvas.drawRect(drop, Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [Color(0x88FFFFFF), Color(0x22FFFFFF), Color(0x10000000)],
+        stops: [0, .48, 1],
+      ).createShader(drop));
+
     if (active && fraction > 0) {
-      final level = orb.bottom - (orb.height * fraction.clamp(0.0, 1.0));
-      final wave = Path()..moveTo(orb.left, level);
-      for (var i = 0; i <= 24; i++) {
-        final x = orb.left + orb.width * i / 24;
-        final y = level + math.sin(i / 24 * math.pi * 2.2) * radius * .075;
-        wave.lineTo(x, y);
-      }
-      wave
-        ..lineTo(orb.right, orb.bottom)
-        ..lineTo(orb.left, orb.bottom)
+      final level = bottom - h * fraction.clamp(0.0, 1.0);
+      final water = Path()
+        ..moveTo(left - 2, level)
+        ..cubicTo(left + w * .22, level - h * .035,
+            cx - w * .12, level + h * .035, cx, level)
+        ..cubicTo(cx + w * .18, level - h * .025,
+            right - w * .18, level + h * .025, right + 2, level)
+        ..lineTo(right + 2, bottom + 2)
+        ..lineTo(left - 2, bottom + 2)
         ..close();
-      canvas.drawPath(wave, Paint()
+      canvas.drawPath(water, Paint()
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [color.withOpacity(.72), color.withOpacity(.96)],
-        ).createShader(orb));
-      // Tiny suspended air bubbles make the filled water feel alive.
-      final bubblePaint = Paint()..color = Colors.white.withOpacity(.58);
+          colors: [color.withOpacity(.70), color.withOpacity(.96)],
+        ).createShader(drop));
+
+      // A soft luminous waterline and tiny air bubbles inside the liquid.
+      final line = Path()
+        ..moveTo(left, level)
+        ..cubicTo(left + w * .22, level - h * .035,
+            cx - w * .12, level + h * .035, cx, level)
+        ..cubicTo(cx + w * .18, level - h * .025,
+            right - w * .18, level + h * .025, right, level);
+      canvas.drawPath(line, Paint()
+        ..color = Colors.white.withOpacity(.72)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.25);
+
       for (final p in <Offset>[
-        Offset(.30, .73), Offset(.68, .82), Offset(.53, .61),
+        Offset(.36, .70), Offset(.64, .80), Offset(.53, .58),
       ]) {
-        final y = orb.top + orb.height * p.dy;
-        if (y > level + radius * .05) {
-          canvas.drawCircle(Offset(orb.left + orb.width * p.dx, y),
-            radius * (p.dx == .53 ? .055 : .038), bubblePaint);
+        final point = Offset(left + w * p.dx, top + h * p.dy);
+        if (point.dy > level + 2) {
+          canvas.drawCircle(point, size.width * (p.dx == .53 ? .027 : .019),
+            Paint()..color = Colors.white.withOpacity(.62));
         }
       }
-      // A fine bright meniscus along the water line.
-      final meniscus = Path()..moveTo(orb.left, level);
-      for (var i = 0; i <= 24; i++) {
-        final x = orb.left + orb.width * i / 24;
-        meniscus.lineTo(x, level + math.sin(i / 24 * math.pi * 2.2) * radius * .075);
-      }
-      canvas.drawPath(meniscus, Paint()
-        ..color = Colors.white.withOpacity(.58)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.15);
     }
     canvas.restore();
 
-    // Glass rim, broad reflection and pinpoint sparkle.
-    canvas.drawCircle(center, radius, Paint()
-      ..color = Colors.white.withOpacity(.72)
+    // Crisp glass edge, curved reflection and sparkle points.
+    canvas.drawPath(dropPath, Paint()
+      ..color = Colors.white.withOpacity(.78)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.35);
-    canvas.drawOval(Rect.fromCenter(
-      center: Offset(center.dx - radius * .34, center.dy - radius * .52),
-      width: radius * .54, height: radius * .18,
-    ), Paint()..color = Colors.white.withOpacity(.62));
-    canvas.drawCircle(Offset(center.dx - radius * .52, center.dy - radius * .24),
-      radius * .075, Paint()..color = Colors.white.withOpacity(.88));
-    canvas.drawCircle(Offset(center.dx + radius * .56, center.dy + radius * .58),
-      radius * .10, Paint()..color = color.withOpacity(.62));
-    canvas.drawCircle(Offset(center.dx + radius * .78, center.dy - radius * .70),
-      radius * .10, Paint()..color = Colors.white.withOpacity(.78));
+    final shine = Path()
+      ..moveTo(cx - w * .12, top + h * .13)
+      ..cubicTo(cx - w * .29, top + h * .25,
+          left + w * .13, top + h * .40, left + w * .19, top + h * .54);
+    canvas.drawPath(shine, Paint()
+      ..color = Colors.white.withOpacity(.72)
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = size.width * .035);
+    canvas.drawCircle(Offset(cx - w * .18, top + h * .31),
+      size.width * .035, Paint()..color = Colors.white.withOpacity(.88));
+    canvas.drawCircle(Offset(cx + w * .22, top + h * .73),
+      size.width * .045, Paint()..color = color.withOpacity(.55));
+    canvas.drawCircle(Offset(cx + w * .18, top + h * .12),
+      size.width * .025, Paint()..color = Colors.white.withOpacity(.82));
   }
 
   @override
