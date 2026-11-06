@@ -3,6 +3,8 @@ name: Build Bubble File Manager APK
 on:
   workflow_dispatch:
   push:
+    branches: [main, 'fix/**']
+  pull_request:
     branches: [main]
 
 jobs:
