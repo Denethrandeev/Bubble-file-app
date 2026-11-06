@@ -1557,7 +1557,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
                 final item = visibleItems[index];
                 final isFolder = item is Directory;
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: _viewMode == 'Compact' ? 3 : 7),
+                  padding: EdgeInsets.only(bottom: _viewMode == 'Compact' ? 3 : 7),
                   child: _glass(child: Row(children: [
                     isFolder
                       ? Icon(Icons.folder_rounded, color: _accent, size: 25)
