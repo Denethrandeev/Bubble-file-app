@@ -310,6 +310,10 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver, SingleTi
   Directory _current = Directory('/storage/emulated/0');
   List<FileSystemEntity> _items = <FileSystemEntity>[];
   String _search = '';
+  bool _globalSearchActive = false;
+  bool _globalSearchBusy = false;
+  int _globalSearchVisited = 0;
+  List<FileSystemEntity> _globalSearchResults = <FileSystemEntity>[];
   bool _foldersFirst = true;
   bool _showHidden = false;
   bool _scanningDuplicates = false;
@@ -853,7 +857,9 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver, SingleTi
   }
 
   List<FileSystemEntity> get _visibleItems {
-    final source = _fileCategory == 'All files' ? _items : _categoryFiles;
+    final source = _globalSearchActive
+        ? _globalSearchResults
+        : (_fileCategory == 'All files' ? _items : _categoryFiles);
     final items = source.where((item) =>
       (_showHidden || !_nameOf(item).startsWith('.')) &&
       _nameOf(item).toLowerCase().contains(_search.toLowerCase()) &&
@@ -890,6 +896,84 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver, SingleTi
       return _sortDescending ? -result : result;
     });
     return items;
+  }
+
+  Future<void> _searchAllStorage() async {
+    final query = _search.trim().toLowerCase();
+    if (query.isEmpty || !_hasStorage || _globalSearchBusy) return;
+    final terms = query.split(RegExp(r'\\s+')).where((term) => term.isNotEmpty).toList();
+    setState(() {
+      _globalSearchActive = true;
+      _globalSearchBusy = true;
+      _globalSearchVisited = 0;
+      _globalSearchResults = <FileSystemEntity>[];
+    });
+    final matches = <FileSystemEntity>[];
+    final pending = <Directory>[
+      for (final path in _storageRoots) Directory(path),
+    ];
+    if (pending.isEmpty) pending.add(_root);
+    final visitedDirectories = <String>{};
+    var visitedFiles = 0;
+    try {
+      while (pending.isNotEmpty && visitedFiles < 30000 && matches.length < 1500) {
+        final directory = pending.removeLast();
+        if (!visitedDirectories.add(directory.path)) continue;
+        try {
+          await for (final entity in directory.list(followLinks: false)) {
+            final name = _nameOf(entity);
+            final path = entity.path.replaceAll('\\\\', '/');
+            final lowerPath = path.toLowerCase();
+            if (entity is Directory) {
+              if (!_showHidden && name.startsWith('.')) continue;
+              if (lowerPath.contains('/android/data/') ||
+                  lowerPath.contains('/android/obb/') ||
+                  lowerPath.contains('/aqua_recycle_bin/') ||
+                  lowerPath.contains('/aqua_encrypted_vault/')) continue;
+              pending.add(entity);
+              continue;
+            }
+            if (entity is! File) continue;
+            visitedFiles++;
+            if (!_showHidden && name.startsWith('.')) continue;
+            final searchable = '$name $lowerPath'.toLowerCase();
+            if (!terms.every(searchable.contains)) continue;
+            if (!_matchesCategory(entity)) continue;
+            matches.add(entity);
+          }
+        } on FileSystemException {
+          // Continue past folders that Android or removable media won't expose.
+        } catch (_) {}
+        if (visitedFiles % 250 == 0 && mounted) {
+          setState(() => _globalSearchVisited = visitedFiles);
+          await Future<void>.delayed(Duration.zero);
+        }
+      }
+      matches.sort((a, b) => _nameOf(a).toLowerCase().compareTo(_nameOf(b).toLowerCase()));
+      if (!mounted) return;
+      setState(() {
+        _globalSearchResults = matches;
+        _globalSearchVisited = visitedFiles;
+        _globalSearchBusy = false;
+      });
+      _message(matches.isEmpty
+          ? 'No matches found in accessible storage.'
+          : 'Found ${matches.length} matches after checking $visitedFiles files.');
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _globalSearchBusy = false);
+      _message('Search stopped: $error');
+    }
+  }
+
+  void _clearGlobalSearch() {
+    setState(() {
+      _globalSearchActive = false;
+      _globalSearchBusy = false;
+      _globalSearchResults = <FileSystemEntity>[];
+      _globalSearchVisited = 0;
+      _search = '';
+    });
   }
 
   Future<void> _findDuplicates() async {
@@ -1721,7 +1805,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver, SingleTi
         color: foreground, fontSize: 18, fontWeight: FontWeight.w800))),
       IconButton(
         tooltip: 'Search files',
-        onPressed: () => setState(() => _tab = 1),
+        onPressed: () => setState(() { _tab = 1; _globalSearchActive = true; }),
         icon: Icon(Icons.search_rounded, color: foreground),
       ),
       IconButton(
@@ -1921,11 +2005,49 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver, SingleTi
         Padding(padding: const EdgeInsets.symmetric(horizontal: 19), child: _glass(
           child: Column(children: [
             TextField(
-              decoration: const InputDecoration(
-                hintText: 'Search this folder', prefixIcon: Icon(Icons.search_rounded),
-                border: InputBorder.none, isDense: true),
-              onChanged: (value) => setState(() => _search = value),
+              textInputAction: TextInputAction.search,
+              decoration: InputDecoration(
+                hintText: _globalSearchActive ? 'Search all storage' : 'Search this folder',
+                prefixIcon: Icon(Icons.search_rounded, color: _accent),
+                suffixIcon: Row(mainAxisSize: MainAxisSize.min, children: [
+                  if (_search.isNotEmpty)
+                    IconButton(
+                      tooltip: 'Clear search',
+                      onPressed: _clearGlobalSearch,
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  IconButton(
+                    tooltip: 'Search every accessible storage location',
+                    onPressed: _globalSearchBusy ? null : _searchAllStorage,
+                    icon: Icon(Icons.travel_explore_rounded, color: _accent),
+                  ),
+                ]),
+                border: InputBorder.none, isDense: true,
+              ),
+              onChanged: (value) => setState(() {
+                _search = value;
+                _globalSearchActive = false;
+                _globalSearchResults = <FileSystemEntity>[];
+              }),
+              onSubmitted: (_) => _searchAllStorage(),
             ),
+            if (_globalSearchActive)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 7),
+                child: Row(children: [
+                  Icon(Icons.public_rounded, size: 14, color: _accent),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(
+                    _globalSearchBusy
+                        ? 'Searching storage… $_globalSearchVisited files checked'
+                        : 'All accessible storage • ${visibleItems.length} results',
+                    style: TextStyle(fontSize: 10, color: _accent),
+                  )),
+                  if (_globalSearchBusy)
+                    const SizedBox(width: 13, height: 13,
+                      child: CircularProgressIndicator(strokeWidth: 1.5)),
+                ]),
+              ),
             Row(children: [
               IconButton(onPressed: () {
                 if (_current.path != _root.path) _loadDirectory(_current.parent);
