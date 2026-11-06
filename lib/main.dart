@@ -1516,6 +1516,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
           ? const BubbleSplashScreen()
           : Scaffold(
         body: Listener(
+          behavior: HitTestBehavior.translucent,
           onPointerDown: (event) {
             _bubbleFieldKey.currentState?.handlePointerDown(event.localPosition);
             _onSecretGestureDown(event);
