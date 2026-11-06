@@ -2251,9 +2251,9 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
     _popAt(local);
   }
 
-  void handlePointerMove(Offset local) => _finger = local;
+  void handlePointerMove(Offset local) => _pointer(local);
 
-  void handlePointerUp() => _finger = null;
+  void handlePointerUp() => _releasePointer();
 
   void _pointer(Offset local) => _finger = local;
 
