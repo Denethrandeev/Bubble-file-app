@@ -170,7 +170,8 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
           final bytes = await file.readAsBytes();
           final faces = await detector.detectFacesFromBytes(
             bytes,
-            mode: face_ml.FaceDetectionMode.standard,
+            // Full mode provides the eye alignment expected by the embedding model.
+            mode: face_ml.FaceDetectionMode.full,
           );
 
           for (final face in faces.take(5)) {
