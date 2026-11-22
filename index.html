@@ -3,26 +3,136 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Bubble File App</title>
-    <style>
-      :root {
-        color-scheme: light dark;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      }
-
-      body {
-        min-height: 100vh;
-        margin: 0;
-        display: grid;
-        place-items: center;
-        text-align: center;
-      }
-    </style>
+    <meta name="theme-color" content="#eef4ff" />
+    <title>Bubble File Manager</title>
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main>
-      <h1>Hello, GitHub Pages!</h1>
-      <p>A test page for the Bubble-file-app GitHub Pages site.</p>
-    </main>
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <span></span><span></span><span></span>
+          </div>
+          <div>
+            <strong>Bubble</strong>
+            <small>File Manager</small>
+          </div>
+        </div>
+
+        <nav class="nav-list" aria-label="Main navigation">
+          <button class="nav-item active" data-view="home">
+            <span class="nav-icon">⌂</span><span>My files</span>
+          </button>
+          <button class="nav-item" data-view="recent">
+            <span class="nav-icon">◷</span><span>Recent</span>
+          </button>
+          <button class="nav-item" data-view="shared">
+            <span class="nav-icon">⇄</span><span>Shared</span>
+          </button>
+          <button class="nav-item" data-view="favorites">
+            <span class="nav-icon">☆</span><span>Favorites</span>
+          </button>
+          <button class="nav-item" data-view="trash">
+            <span class="nav-icon">♲</span><span>Trash</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-spacer"></div>
+
+        <section class="storage-card" aria-label="Storage usage">
+          <div class="storage-heading">
+            <span>Storage</span>
+            <strong id="storagePercent">48%</strong>
+          </div>
+          <div class="storage-track"><div class="storage-fill" id="storageFill"></div></div>
+          <p><strong id="storageUsed">48.2 GB</strong> of 100 GB</p>
+          <button class="upgrade-button" id="upgradeButton">Upgrade storage</button>
+        </section>
+
+        <button class="profile" id="profileButton" type="button">
+          <span class="avatar">HG</span>
+          <span class="profile-copy"><strong>H. G. Aluthge</strong><small>Personal account</small></span>
+          <span class="profile-more">•••</span>
+        </button>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <button class="icon-button mobile-menu" id="menuButton" type="button" aria-label="Open menu">☰</button>
+          <label class="search-box">
+            <span aria-hidden="true">⌕</span>
+            <input id="searchInput" type="search" placeholder="Search in My files" autocomplete="off" />
+            <kbd>⌘ K</kbd>
+          </label>
+          <div class="top-actions">
+            <button class="icon-button" id="themeButton" type="button" aria-label="Toggle theme">☾</button>
+            <button class="icon-button notification-button" type="button" aria-label="Notifications">
+              ♢
+              <span class="notification-dot"></span>
+            </button>
+            <button class="add-button" id="newButton" type="button"><span>＋</span> New</button>
+          </div>
+        </header>
+
+        <section class="content">
+          <div class="title-row">
+            <div>
+              <p class="eyebrow" id="viewEyebrow">Personal storage</p>
+              <h1 id="viewTitle">My files</h1>
+            </div>
+            <div class="view-actions">
+              <button class="icon-button" id="sortButton" type="button" aria-label="Sort files">↕</button>
+              <div class="view-toggle" aria-label="View style">
+                <button class="active" data-layout="grid" type="button" aria-label="Grid view">▦</button>
+                <button data-layout="list" type="button" aria-label="List view">☷</button>
+              </div>
+            </div>
+          </div>
+
+          <section class="quick-section" id="quickSection">
+            <div class="section-heading">
+              <h2>Quick access</h2>
+              <button type="button" id="viewAllButton">View all</button>
+            </div>
+            <div class="quick-grid" id="quickGrid"></div>
+          </section>
+
+          <section class="file-section">
+            <div class="section-heading">
+              <h2 id="fileSectionTitle">All files</h2>
+              <span id="fileCount">0 items</span>
+            </div>
+            <div class="file-grid" id="fileGrid"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <div class="drop-overlay" id="dropOverlay">
+      <div><strong>Drop files here</strong><span>to add them to My files</span></div>
+    </div>
+
+    <div class="menu-popover" id="newMenu" hidden>
+      <button type="button" id="uploadButton"><span class="menu-symbol upload">↑</span><span><strong>Upload files</strong><small>Choose from your device</small></span></button>
+      <button type="button" id="folderButton"><span class="menu-symbol folder">▰</span><span><strong>New folder</strong><small>Create a folder</small></span></button>
+    </div>
+
+    <div class="modal-backdrop" id="modalBackdrop" hidden>
+      <form class="modal" id="folderForm">
+        <h2>Create new folder</h2>
+        <label>Folder name<input id="folderName" type="text" value="Untitled folder" maxlength="60" /></label>
+        <div class="modal-actions">
+          <button type="button" id="cancelFolder">Cancel</button>
+          <button class="primary" type="submit">Create</button>
+        </div>
+      </form>
+    </div>
+
+    <input id="fileInput" type="file" multiple hidden />
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="sidebar-scrim" id="sidebarScrim"></div>
+
+    <script src="app.js"></script>
   </body>
 </html>
