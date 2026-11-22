@@ -16,7 +16,7 @@ jobs:
         with:
           channel: stable
       - name: Create Android platform scaffold
-        run: flutter create --platforms=android --org com.aqua --project-name bubble_file_manager .
+        run: flutter create --platforms=android --org com.aqua --project-name bubble_file_manager --no-pub .
       - name: Set Bubble File Manager app label
         run: |
           python3 - <<'PY'
@@ -49,10 +49,6 @@ jobs:
             <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
               <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
               <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
-              <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-              <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-              <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
-              <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
               <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
               <uses-permission android:name="android.permission.USE_BIOMETRIC" />
               <uses-permission android:name="android.permission.USE_FINGERPRINT" />
@@ -126,6 +122,7 @@ jobs:
                       .setMethodCallHandler {{ call, result ->
                           try {{
                               when (call.method) {{
+                                  "sdkInt" -> result.success(Build.VERSION.SDK_INT)
                                   "storageInfo" -> {{
                                       val stats = StatFs(Environment.getExternalStorageDirectory().absolutePath)
                                       result.success(mapOf("total" to stats.totalBytes, "free" to stats.availableBytes))
@@ -217,6 +214,36 @@ jobs:
           '''
               path.write_text(source)
               print(f"Installed storage stats channel in {path}")
+          PY
+      - name: Verify Flutter Android application
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          manifest = Path("android/app/src/main/AndroidManifest.xml")
+          gradle_files = [Path("android/app/build.gradle.kts"), Path("android/app/build.gradle")]
+          activities = list(Path("android/app/src/main").rglob("MainActivity.kt"))
+          gradle_files = [path for path in gradle_files if path.is_file()]
+          if not manifest.is_file() or not gradle_files or not activities:
+              raise SystemExit("Generated Flutter Android project is missing required app files")
+          manifest_text = manifest.read_text(encoding="utf-8")
+          gradle_text = "\n".join(path.read_text(encoding="utf-8") for path in gradle_files)
+          activity_text = activities[0].read_text(encoding="utf-8")
+          checks = {
+              "Bubble app label": 'android:label="Bubble File Manager"' in manifest_text,
+              "Bubble application ID": 'com.aqua.bubble_file_manager' in gradle_text,
+              "All files access permission": "android.permission.MANAGE_EXTERNAL_STORAGE" in manifest_text,
+              "Legacy storage permission": "android.permission.READ_EXTERNAL_STORAGE" in manifest_text,
+              "Media location permission": "android.permission.ACCESS_MEDIA_LOCATION" in manifest_text,
+              "Flutter activity": "FlutterFragmentActivity" in activity_text,
+              "Native storage channel": '"aqua/storage"' in activity_text,
+              "Android SDK version channel": '"sdkInt"' in activity_text,
+          }
+          failures = [name for name, passed in checks.items() if not passed]
+          for name, passed in checks.items():
+              print(f"{'OK' if passed else 'MISSING'}: {name}")
+          if failures:
+              raise SystemExit("Android app scaffold verification failed: " + ", ".join(failures))
           PY
       - name: Resolve packages
         run: flutter pub get

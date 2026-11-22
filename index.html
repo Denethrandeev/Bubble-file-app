@@ -27,9 +27,6 @@
           <button class="nav-item" data-view="recent">
             <span class="nav-icon">◷</span><span>Recent</span>
           </button>
-          <button class="nav-item" data-view="shared">
-            <span class="nav-icon">⇄</span><span>Shared</span>
-          </button>
           <button class="nav-item" data-view="favorites">
             <span class="nav-icon">☆</span><span>Favorites</span>
           </button>
@@ -42,19 +39,17 @@
 
         <section class="storage-card" aria-label="Storage usage">
           <div class="storage-heading">
-            <span>Storage</span>
-            <strong id="storagePercent">48%</strong>
+            <span>Browser workspace</span>
+            <strong id="storageCount">0 items</strong>
           </div>
-          <div class="storage-track"><div class="storage-fill" id="storageFill"></div></div>
-          <p><strong id="storageUsed">48.2 GB</strong> of 100 GB</p>
-          <button class="upgrade-button" id="upgradeButton">Upgrade storage</button>
+          <p class="storage-usage"><strong id="storageUsed">0 B</strong> saved in this browser</p>
+          <small class="storage-note">Stored on this device only</small>
         </section>
 
-        <button class="profile" id="profileButton" type="button">
-          <span class="avatar">HG</span>
-          <span class="profile-copy"><strong>H. G. Aluthge</strong><small>Personal account</small></span>
-          <span class="profile-more">•••</span>
-        </button>
+        <div class="profile" aria-label="Browser workspace details">
+          <span class="avatar">B</span>
+          <span class="profile-copy"><strong>Local workspace</strong><small>Saved in this browser</small></span>
+        </div>
       </aside>
 
       <main class="main-content">
@@ -62,27 +57,36 @@
           <button class="icon-button mobile-menu" id="menuButton" type="button" aria-label="Open menu">☰</button>
           <label class="search-box">
             <span aria-hidden="true">⌕</span>
-            <input id="searchInput" type="search" placeholder="Search in My files" autocomplete="off" />
+            <input id="searchInput" type="search" placeholder="Search this workspace" autocomplete="off" />
             <kbd>⌘ K</kbd>
           </label>
           <div class="top-actions">
             <button class="icon-button" id="themeButton" type="button" aria-label="Toggle theme">☾</button>
-            <button class="icon-button notification-button" type="button" aria-label="Notifications">
-              ♢
-              <span class="notification-dot"></span>
-            </button>
             <button class="add-button" id="newButton" type="button"><span>＋</span> New</button>
           </div>
         </header>
 
         <section class="content">
+          <div class="workspace-notice" role="note">
+            <span class="notice-icon" aria-hidden="true">ⓘ</span>
+            <div><strong>Demo / Browser Workspace</strong><span id="workspaceNoticeText">Files you add are saved in this browser on this device. This web app does not access device storage automatically or sync with the Android app.</span></div>
+          </div>
           <div class="title-row">
             <div>
               <p class="eyebrow" id="viewEyebrow">Personal storage</p>
               <h1 id="viewTitle">My files</h1>
             </div>
             <div class="view-actions">
-              <button class="icon-button" id="sortButton" type="button" aria-label="Sort files">↕</button>
+              <label class="sort-control">
+                <span>Sort</span>
+                <select id="sortSelect" aria-label="Sort files">
+                  <option value="name">Name</option>
+                  <option value="type">Type</option>
+                  <option value="size">Size</option>
+                  <option value="date">Date</option>
+                </select>
+              </label>
+              <button class="icon-button" id="sortDirection" type="button" aria-label="Sort ascending">↑</button>
               <div class="view-toggle" aria-label="View style">
                 <button class="active" data-layout="grid" type="button" aria-label="Grid view">▦</button>
                 <button data-layout="list" type="button" aria-label="List view">☷</button>
@@ -93,7 +97,7 @@
           <section class="quick-section" id="quickSection">
             <div class="section-heading">
               <h2>Quick access</h2>
-              <button type="button" id="viewAllButton">View all</button>
+              <button type="button" id="viewAllButton">View recent</button>
             </div>
             <div class="quick-grid" id="quickGrid"></div>
           </section>
@@ -101,8 +105,23 @@
           <section class="file-section">
             <div class="section-heading">
               <h2 id="fileSectionTitle">All files</h2>
-              <span id="fileCount">0 items</span>
+              <div class="file-list-controls">
+                <label class="filter-control">
+                  <span>Type</span>
+                  <select id="typeFilter" aria-label="Filter by file type">
+                    <option value="all">All types</option>
+                    <option value="folder">Folders</option>
+                    <option value="image">Images</option>
+                    <option value="video">Videos</option>
+                    <option value="audio">Audio</option>
+                    <option value="document">Documents</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <span id="fileCount">0 items</span>
+              </div>
             </div>
+            <nav class="breadcrumbs" id="breadcrumbs" aria-label="Folder path"></nav>
             <div class="file-grid" id="fileGrid"></div>
           </section>
         </section>
@@ -110,7 +129,7 @@
     </div>
 
     <div class="drop-overlay" id="dropOverlay">
-      <div><strong>Drop files here</strong><span>to add them to My files</span></div>
+      <div><strong>Drop files here</strong><span>to add them to this browser workspace</span></div>
     </div>
 
     <div class="menu-popover" id="newMenu" hidden>
@@ -120,16 +139,18 @@
 
     <div class="modal-backdrop" id="modalBackdrop" hidden>
       <form class="modal" id="folderForm">
-        <h2>Create new folder</h2>
-        <label>Folder name<input id="folderName" type="text" value="Untitled folder" maxlength="60" /></label>
-        <div class="modal-actions">
-          <button type="button" id="cancelFolder">Cancel</button>
-          <button class="primary" type="submit">Create</button>
-        </div>
+        <div id="modalContent"></div>
       </form>
     </div>
 
     <input id="fileInput" type="file" multiple hidden />
+    <div class="preview-backdrop" id="previewBackdrop" hidden>
+      <section class="preview-dialog" role="dialog" aria-modal="true" aria-labelledby="previewTitle">
+        <header><div><h2 id="previewTitle"></h2><p id="previewDetails"></p></div><button id="closePreview" type="button" aria-label="Close preview">×</button></header>
+        <div class="preview-content" id="previewContent"></div>
+        <footer><button id="downloadPreview" class="primary" type="button">Download</button><button id="closePreviewFooter" type="button">Close</button></footer>
+      </section>
+    </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <div class="sidebar-scrim" id="sidebarScrim"></div>
 

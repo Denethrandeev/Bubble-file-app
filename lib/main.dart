@@ -10,6 +10,7 @@ import 'media_thumbnail.dart';
 import 'location_albums.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:crypto/crypto.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -145,6 +146,7 @@ class AquaApp extends StatefulWidget {
 
 class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   int _tab = 0;
+  final PageController _tabController = PageController();
   int _theme = 0;
   bool _gravity = true;
   bool _waterEnabled = true;
@@ -157,6 +159,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   bool _light = false;
   bool _checkingPermission = false;
   bool _hasStorage = false;
+  bool _usesAllFilesAccess = true;
   int _storageTotalBytes = 0;
   int _storageFreeBytes = 0;
   List<Map<String, dynamic>> _storageVolumes = <Map<String, dynamic>>[];
@@ -165,6 +168,8 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   Directory _root = Directory('/storage/emulated/0');
   Directory _current = Directory('/storage/emulated/0');
   List<FileSystemEntity> _items = <FileSystemEntity>[];
+  List<PlatformFile> _pickerFiles = <PlatformFile>[];
+  String? _directoryWarning;
   String _search = '';
   bool _foldersFirst = true;
   bool _showHidden = false;
@@ -187,6 +192,30 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
 
   Color get _accent => aquaAccents[_theme];
 
+  Future<int> _androidSdkInt() async {
+    final sdkInt = await const MethodChannel('aqua/storage').invokeMethod<int>('sdkInt');
+    if (sdkInt == null) throw StateError('Android did not report its SDK version.');
+    return sdkInt;
+  }
+
+  Future<Permission> _requiredStoragePermission() async {
+    return (await _androidSdkInt()) >= 30
+        ? Permission.manageExternalStorage
+        : Permission.storage;
+  }
+
+  void _selectTab(int tab) {
+    if (_tab == tab) return;
+    setState(() => _tab = tab);
+    if (_tabController.hasClients) {
+      _tabController.animateToPage(
+        tab,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
   bool _showSplash = true;
   final GlobalKey<_BubbleFieldState> _bubbleFieldKey = GlobalKey<_BubbleFieldState>();
 
@@ -204,7 +233,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
         setState(() => _waterTilt = next);
       }
     }, onError: (_) {});
-    Future<void>.delayed(const Duration(milliseconds: 3200), () {
+    Future<void>.delayed(const Duration(milliseconds: 1200), () {
       if (mounted) setState(() => _showSplash = false);
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -220,19 +249,26 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
     }
     if (mounted) setState(() => _checkingPermission = true);
     try {
-      // Android 11+ uses a special All files access setting. A legacy
-      // media permission is NOT enough to browse the whole shared-storage tree.
-      var status = await Permission.manageExternalStorage.status;
+      final usesAllFilesAccess = (await _androidSdkInt()) >= 30;
+      final permission = usesAllFilesAccess
+          ? Permission.manageExternalStorage
+          : Permission.storage;
+      var status = await permission.status;
       if (!status.isGranted) {
-        status = await Permission.manageExternalStorage.request();
+        status = await permission.request();
       }
       if (!mounted) return;
       setState(() {
         _hasStorage = status.isGranted;
+        _usesAllFilesAccess = usesAllFilesAccess;
         _checkingPermission = false;
         _storageMessage = status.isGranted
-            ? 'All files access is enabled.'
-            : 'To browse shared storage, enable “Allow access to manage all files” in Android settings, then return to Bubble. Android keeps private app data and protected system files inaccessible.';
+            ? usesAllFilesAccess
+                ? 'All files access is enabled. Private app data and protected system files remain inaccessible.'
+                : 'Storage permission is enabled. Android may still restrict some folders; use the system picker for selected files.'
+            : usesAllFilesAccess
+                ? 'To browse shared folders, enable “Allow access to manage all files” in Android settings. Or choose individual files with Android’s system picker. Private app data and protected system files remain inaccessible.'
+                : 'Allow storage access in the Android permission prompt, or choose individual files with Android’s system picker.';
       });
       if (status.isGranted) {
         await _loadStorageInfo();
@@ -304,7 +340,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
         final directory = Directory(path);
         setState(() => _root = directory);
         _loadDirectory(directory);
-        setState(() => _tab = 1);
+        _selectTab(1);
       },
       borderRadius: BorderRadius.circular(18),
       child: Container(
@@ -610,7 +646,11 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   }
 
   Future<void> _loadDirectory(Directory directory) async {
-    if (!_hasStorage && !await Permission.manageExternalStorage.isGranted) return;
+    if (!_hasStorage) {
+      final permission = await _requiredStoragePermission();
+      final granted = await permission.isGranted;
+      if (!granted) return;
+    }
     try {
       // Read directory entries once; the visible list applies the selected
       // sort once when the Files view is built (avoids sorting twice).
@@ -620,10 +660,83 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
         _current = directory;
         _items = entries;
         _hasStorage = true;
+        _directoryWarning = null;
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => _storageMessage = 'Cannot open this folder: ' + e.toString());
+      final path = directory.path.toLowerCase();
+      final message = path.contains('/android/data') || path.contains('/android/obb')
+          ? 'Android protects “${_nameOf(directory)}” from file managers. Choose an accessible folder or use Android’s system picker for individual files.'
+          : e.toString().toLowerCase().contains('permission')
+              ? 'Android denied access to “${_nameOf(directory)}”. It may be protected; choose another folder or use the system picker.'
+              : 'Cannot open “${_nameOf(directory)}”: $e';
+      setState(() {
+        _storageMessage = message;
+        _directoryWarning = message;
+      });
+      _message(message);
+    }
+  }
+
+  Future<void> _openQuickFolder(String label, List<String> names) async {
+    if (!_hasStorage) {
+      _message('Allow All files access or choose individual files with Android’s system picker.');
+      return;
+    }
+    for (final name in names) {
+      final directory = Directory('${_root.path}${Platform.pathSeparator}$name');
+      if (await directory.exists()) {
+        setState(() {
+          _fileCategory = 'All files';
+          _search = '';
+        });
+        _selectTab(1);
+        await _loadDirectory(directory);
+        return;
+      }
+    }
+    _message('$label is not available on this storage volume.');
+  }
+
+  Future<void> _pickFilesWithoutAllAccess() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        withData: false,
+      );
+      if (result == null) return;
+      final accessible = result.files.where((file) => file.path != null).toList();
+      if (accessible.isEmpty) {
+        _message('Android did not provide readable file paths. Try a different file or allow All files access.');
+        return;
+      }
+      if (!mounted) return;
+      setState(() => _pickerFiles = accessible);
+      _message('${accessible.length} selected file${accessible.length == 1 ? '' : 's'} are available below.');
+    } catch (error) {
+      _message('Could not open Android’s file picker: $error');
+    }
+  }
+
+  Future<void> _openPickedFile(PlatformFile picked) async {
+    final path = picked.path;
+    if (path == null) {
+      _message('Android did not provide a readable path for ${picked.name}.');
+      return;
+    }
+    await _openEntity(File(path));
+  }
+
+  Future<void> _sharePickedFile(PlatformFile picked) async {
+    final path = picked.path;
+    if (path == null) {
+      _message('Android did not provide a shareable path for ${picked.name}.');
+      return;
+    }
+    try {
+      await Share.shareXFiles([XFile(path)], text: picked.name);
+    } catch (error) {
+      _message('Could not share ${picked.name}: $error');
     }
   }
 
@@ -683,8 +796,8 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
     setState(() {
       _categoryFiles = found;
       _categoryScanBusy = false;
-      _tab = 1;
     });
+    _selectTab(1);
   }
 
   bool _matchesCategory(FileSystemEntity item) {
@@ -1301,7 +1414,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   Future<void> _syncStoragePermissionAfterResume() async {
     if (!Platform.isAndroid) return;
     try {
-      final status = await Permission.manageExternalStorage.status;
+      final status = await (await _requiredStoragePermission()).status;
       if (!mounted) return;
       if (status.isGranted) {
         final newlyGranted = !_hasStorage;
@@ -1322,7 +1435,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       } else if (_hasStorage) {
         setState(() {
           _hasStorage = false;
-          _storageMessage = 'Storage access is not enabled. Tap Check permission to grant access again.';
+          _storageMessage = 'Storage permission is not enabled. Grant All files access or choose individual files with Android’s system picker.';
         });
       }
     } catch (error) {
@@ -1335,6 +1448,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _tabController.dispose();
     _waterSensor?.cancel();
     _recycleTimer?.cancel();
     _mediaAudioPlayer.dispose();
@@ -1346,6 +1460,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
     final base = _light ? const Color(0xFFEAF5F7) : const Color(0xFF04141E);
     final foreground = _light ? const Color(0xFF102B38) : Colors.white;
     return MaterialApp(
+      title: 'Bubble File Manager',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -1386,12 +1501,19 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
             )),
           SafeArea(child: Column(children: [
             _header(foreground),
-            Expanded(child: IndexedStack(index: _tab, children: [
-              _home(foreground),
-              _files(foreground),
-              _settings(foreground),
-              _recycleBin(foreground),
-            ])),
+            Expanded(child: PageView(
+              controller: _tabController,
+              physics: const NeverScrollableScrollPhysics(),
+              onPageChanged: (index) {
+                if (_tab != index) setState(() => _tab = index);
+              },
+              children: [
+                _home(foreground),
+                _files(foreground),
+                _settings(foreground),
+                _recycleBin(foreground),
+              ],
+            )),
             _bottomNav(foreground),
           ])),
           if (_secretGesturePoints.length > 1)
@@ -1420,12 +1542,13 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
         Text('FILE MANAGER', style: TextStyle(color: foreground.withOpacity(.55),
           fontSize: 9, letterSpacing: 2.4)),
       ])),
-      IconButton(onPressed: () => setState(() => _tab = 2),
+      IconButton(onPressed: () => _selectTab(2),
         icon: Icon(Icons.tune_rounded, color: foreground.withOpacity(.8))),
     ]),
   );
 
   Widget _home(Color foreground) => ListView(
+    key: const PageStorageKey<String>('home-page'),
     padding: const EdgeInsets.fromLTRB(19, 8, 19, 22),
     children: [
       const SizedBox(height: 10),
@@ -1443,10 +1566,27 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
           ),
         ]),
         if (!_hasStorage)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Text('Allow storage access to show your storage drops.',
-              style: TextStyle(fontSize: 12, color: Colors.white60)),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Allow storage access to browse shared folders, or choose individual files with Android’s system picker.',
+                style: TextStyle(fontSize: 12, color: Colors.white60, height: 1.4)),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, runSpacing: 6, children: [
+                FilledButton.tonalIcon(
+                  onPressed: _checkingPermission ? null : _requestStorage,
+                  icon: const Icon(Icons.folder_open_rounded, size: 17),
+                  label: Text(_checkingPermission
+                      ? 'Checking…'
+                      : _usesAllFilesAccess ? 'Allow All files access' : 'Allow storage access'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _pickFilesWithoutAllAccess,
+                  icon: const Icon(Icons.file_open_rounded, size: 17),
+                  label: const Text('Pick files'),
+                ),
+              ]),
+            ]),
           )
         else if (_storageVolumes.isNotEmpty)
           SingleChildScrollView(
@@ -1477,6 +1617,21 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
             )),
           ]),
       ])),
+      if (_hasStorage) ...[
+        const SizedBox(height: 17),
+        const Text('QUICK FOLDERS', style: TextStyle(fontSize: 10, letterSpacing: 2, color: Colors.white60)),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(children: [
+            _quickFolderChip('Downloads', Icons.download_rounded, const ['Download', 'Downloads']),
+            _quickFolderChip('Documents', Icons.description_rounded, const ['Documents']),
+            _quickFolderChip('Pictures', Icons.image_rounded, const ['Pictures']),
+            _quickFolderChip('Music', Icons.headphones_rounded, const ['Music']),
+            _quickFolderChip('Videos', Icons.movie_rounded, const ['Movies', 'Videos']),
+          ]),
+        ),
+      ],
       const SizedBox(height: 20),
       const Text('EXPLORE', style: TextStyle(fontSize: 10, letterSpacing: 2, color: Colors.white60)),
       const SizedBox(height: 11),
@@ -1518,6 +1673,18 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
     ],
   );
 
+  Widget _quickFolderChip(String label, IconData icon, List<String> paths) =>
+    Padding(
+      padding: const EdgeInsets.only(right: 7),
+      child: ActionChip(
+        avatar: Icon(icon, size: 16, color: _accent),
+        label: Text(label, style: const TextStyle(fontSize: 11)),
+        onPressed: () => _openQuickFolder(label, paths),
+        backgroundColor: Colors.white.withOpacity(.08),
+        side: BorderSide(color: Colors.white.withOpacity(.12)),
+      ),
+    );
+
   Widget _category(String title, IconData icon) => InkWell(
     borderRadius: BorderRadius.circular(20),
     onTap: () {
@@ -1529,7 +1696,8 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
           ),
         ));
       } else if (title == 'All files') {
-        setState(() { _fileCategory = title; _search = ''; _tab = 1; });
+        setState(() { _fileCategory = title; _search = ''; });
+        _selectTab(1);
         _loadDirectory(_root);
       } else {
         _loadCategoryFiles(title);
@@ -1541,6 +1709,60 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w600))),
       const Icon(Icons.chevron_right_rounded, color: Colors.white38, size: 18),
     ])),
+  );
+
+  Widget _storageAccessFallback() => Center(
+    child: SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 430),
+        child: _glass(child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.folder_off_rounded, color: _accent, size: 42),
+          const SizedBox(height: 12),
+          const Text('Storage access needed', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Text(_storageMessage, textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white60, height: 1.4)),
+          const SizedBox(height: 16),
+          Wrap(alignment: WrapAlignment.center, spacing: 8, runSpacing: 8, children: [
+            FilledButton.icon(
+              onPressed: _checkingPermission ? null : _requestStorage,
+              icon: const Icon(Icons.security_rounded),
+              label: Text(_checkingPermission
+                  ? 'Checking…'
+                  : _usesAllFilesAccess ? 'Allow All files access' : 'Allow storage access'),
+            ),
+            OutlinedButton.icon(
+              onPressed: _pickFilesWithoutAllAccess,
+              icon: const Icon(Icons.file_open_rounded),
+              label: const Text('Pick individual files'),
+            ),
+          ]),
+          if (_pickerFiles.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text('FILES SELECTED WITH ANDROID', style: TextStyle(fontSize: 10, letterSpacing: 1.4)),
+            ),
+            const SizedBox(height: 6),
+            for (final picked in _pickerFiles.take(8))
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.insert_drive_file_outlined),
+                title: Text(picked.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                subtitle: Text(_formatBytes(picked.size), style: const TextStyle(fontSize: 10)),
+                onTap: () => _openPickedFile(picked),
+                trailing: IconButton(
+                  tooltip: 'Share ${picked.name}',
+                  icon: const Icon(Icons.share_rounded, size: 18),
+                  onPressed: () => _sharePickedFile(picked),
+                ),
+              ),
+          ],
+        ])),
+      ),
+    ),
   );
 
   Widget _files(Color foreground) {
@@ -1559,21 +1781,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
         ]),
       ),
       if (!_hasStorage)
-        Expanded(child: Center(child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: _glass(child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Icons.folder_off_rounded, color: _accent, size: 42),
-            const SizedBox(height: 12),
-            const Text('Storage permission needed', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            Text(_storageMessage, textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white60, height: 1.4)),
-            const SizedBox(height: 16),
-            FilledButton.icon(onPressed: _checkingPermission ? null : _requestStorage,
-              icon: const Icon(Icons.security_rounded),
-              label: Text(_checkingPermission ? 'Checking…' : 'Allow storage access')),
-          ])),
-        )))
+        Expanded(child: _storageAccessFallback())
       else ...[
         Padding(padding: const EdgeInsets.symmetric(horizontal: 19), child: _glass(
           child: Column(children: [
@@ -1644,6 +1852,27 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
             ]),
           ]),
         )),
+        if (_directoryWarning != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(19, 8, 19, 0),
+            child: _glass(child: Row(children: [
+              Icon(Icons.info_outline_rounded, color: _accent, size: 19),
+              const SizedBox(width: 9),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(_directoryWarning!, style: const TextStyle(fontSize: 11, height: 1.4)),
+                TextButton.icon(
+                  onPressed: _pickFilesWithoutAllAccess,
+                  icon: const Icon(Icons.file_open_rounded, size: 16),
+                  label: const Text('Pick individual files'),
+                ),
+              ])),
+              IconButton(
+                tooltip: 'Dismiss folder access message',
+                onPressed: () => setState(() => _directoryWarning = null),
+                icon: const Icon(Icons.close_rounded, size: 17),
+              ),
+            ])),
+          ),
         const SizedBox(height: 8),
         Expanded(child: _categoryScanBusy
           ? const Center(child: CircularProgressIndicator())
@@ -1651,6 +1880,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
           ? const Center(child: Text('No matching files found', style: TextStyle(color: Colors.white54)))
           : _viewMode == 'Grid' || _viewMode == 'Large thumbnails'
           ? GridView.builder(
+              key: const PageStorageKey<String>('files-grid'),
               padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: _viewMode == 'Large thumbnails' ? 2 : 3,
@@ -1676,6 +1906,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
               },
             )
           : ListView.builder(
+              key: PageStorageKey<String>('files-list-$_viewMode'),
               padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
               itemCount: visibleItems.length,
               itemBuilder: (context, index) {
@@ -1732,6 +1963,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
 
   Widget _recycleBin(Color foreground) {
     return ListView(
+      key: const PageStorageKey<String>('recycle-bin-page'),
       padding: const EdgeInsets.fromLTRB(19, 10, 19, 22),
       children: [
         Text('Recycle Bin', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: foreground)),
@@ -1763,6 +1995,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   }
 
   Widget _settings(Color foreground) => ListView(
+    key: const PageStorageKey<String>('settings-page'),
     padding: const EdgeInsets.fromLTRB(19, 10, 19, 22),
     children: [
       Text('Settings', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: foreground)),
@@ -1911,7 +2144,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   );
 
   Widget _navItem(String label, IconData icon, int index) => InkWell(
-    onTap: () => setState(() => _tab = index),
+    onTap: () => _selectTab(index),
     borderRadius: BorderRadius.circular(17),
     child: Padding(padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 6),
       child: Column(mainAxisSize: MainAxisSize.min, children: [
