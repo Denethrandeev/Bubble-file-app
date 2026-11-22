@@ -89,11 +89,6 @@ function openDatabase() {
     request.onerror = () => reject(request.error || new Error("Could not open browser storage."));
     request.onblocked = () => reject(new Error("Browser storage is busy in another tab. Close other Bubble tabs and retry."));
   });
-  els.typeFilter.addEventListener("change", () => {
-    typeFilter = els.typeFilter.value;
-    savePreference("typeFilter", typeFilter);
-    render();
-  });
 }
 
 function readAllItems() {
@@ -704,6 +699,11 @@ document.querySelectorAll(".nav-item").forEach((button) => {
 document.querySelector("#viewAllButton").addEventListener("click", () => setView("recent"));
 
 els.searchInput.addEventListener("input", render);
+els.typeFilter.addEventListener("change", () => {
+  typeFilter = els.typeFilter.value;
+  savePreference("typeFilter", typeFilter);
+  render();
+});
 els.sortSelect.addEventListener("change", () => {
   sortMode = els.sortSelect.value;
   savePreference("sortMode", sortMode);

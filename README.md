@@ -9,8 +9,9 @@ Bubble File Manager has two separate experiences:
 - **Android** (`lib/`): a Flutter app that browses shared phone storage using
   Android permissions and native file APIs.
 
-## Test the web app
+## Run and build the web app
 
+The web app is static HTML, CSS, and JavaScript; there is no compilation step.
 Serve the repository root over HTTP (IndexedDB is best tested on `localhost`):
 
 ```sh
@@ -19,14 +20,22 @@ python3 -m http.server 8000
 
 Open `http://localhost:8000`, create a folder, upload or drop files, and try
 renaming, moving/copying, favoriting, downloading, previewing, sorting, and
-switching grid/list views. Reload the page to verify the workspace persists.
+switching grid/list views. Workspace items and file contents are saved in
+IndexedDB for this site in the current browser profile. Reload the page to
+verify the workspace persists.
 Use **Trash** to restore an item or permanently delete it. Clearing the site's
 browser data also clears this workspace.
 
-## Build and install the Android app
+To publish the web app, deploy the repository root as static files (for example,
+the existing GitHub Pages workflow does this on pushes to `main`).
 
-The **Build Bubble File Manager APK** workflow runs Flutter analysis and tests,
-then builds a release APK and uploads it as an artifact.
+## Build and install the Android APK
+
+The **Build Bubble File Manager APK** workflow generates the Android platform
+scaffold and native storage channel, verifies the storage workflow, runs Flutter
+analysis and tests, then builds a release APK and uploads it as an artifact.
+The repository does not include generated Android Gradle files; use this
+workflow for a reproducible APK build.
 
 1. Open this repository's **Actions** tab.
 2. Select **Build Bubble File Manager APK**, then choose **Run workflow** (or
@@ -35,10 +44,10 @@ then builds a release APK and uploads it as an artifact.
    `bubble-file-manager-release-apk`.
 4. Extract and install the APK. Android may ask you to allow installation from
    the app used to open it.
-5. Grant **Allow access to manage all files** to browse the shared-storage
-   folders. If you decline, use **Pick individual files** to select files with
-   Android's system picker instead; the picker grants access only to the files
-   you select, without granting broad media-library access.
+5. Grant **Allow access to manage all files** to browse shared-storage folders.
+   If you decline, use **Pick individual files** on the storage prompt to open
+   Android's system picker; selected files remain available to open or share
+   without granting broad storage access.
 
 After granting access, try the Downloads, Documents, Pictures, Music, and Videos
 shortcuts, then browse into folders and test search, sorting, rename, copy/move,

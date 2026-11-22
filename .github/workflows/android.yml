@@ -15,6 +15,28 @@ jobs:
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+      - name: Verify browser workspace and Android storage fallbacks
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          web = Path("app.js").read_text(encoding="utf-8")
+          android = Path("lib/main.dart").read_text(encoding="utf-8")
+          checks = {
+              "IndexedDB workspace database": 'indexedDB.open(DB_NAME, DB_VERSION)' in web,
+              "Workspace loaded from IndexedDB": 'objectStore(STORE_NAME).getAll()' in web,
+              "Uploaded file blobs persisted": 'blob: file' in web,
+              "Workspace initialized on page load": 'await openDatabase();' in web and 'items = await readAllItems();' in web,
+              "Android file-picker fallback": '_pickFilesWithoutAllAccess' in android and 'FilePicker.platform.pickFiles(' in android,
+              "Picker fallback shown when storage is denied": 'Widget _storageAccessFallback()' in android and "label: const Text('Pick individual files')" in android,
+              "Android quick-folder shortcuts": all(f"_quickFolderChip('{folder}'" in android for folder in ("Downloads", "Documents", "Pictures", "Music", "Videos")),
+          }
+          failures = [name for name, passed in checks.items() if not passed]
+          for name, passed in checks.items():
+              print(f"{'OK' if passed else 'MISSING'}: {name}")
+          if failures:
+              raise SystemExit("Storage workflow verification failed: " + ", ".join(failures))
+          PY
       - name: Create Android platform scaffold
         run: flutter create --platforms=android --org com.aqua --project-name bubble_file_manager --no-pub .
       - name: Set Bubble File Manager app label
