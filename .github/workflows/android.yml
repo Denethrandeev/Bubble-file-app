@@ -16,7 +16,7 @@ jobs:
         with:
           channel: stable
       - name: Create Android platform scaffold
-        run: flutter create --platforms=android --project-name bubble_file_manager .
+        run: flutter create --platforms=android --org com.aqua --project-name bubble_file_manager .
       - name: Set Bubble File Manager app label
         run: |
           python3 - <<'PY'

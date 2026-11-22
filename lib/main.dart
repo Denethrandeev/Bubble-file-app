@@ -160,7 +160,8 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   int _storageTotalBytes = 0;
   int _storageFreeBytes = 0;
   List<Map<String, dynamic>> _storageVolumes = <Map<String, dynamic>>[];
-  String _storageMessage = 'Allow access to browse your phone storage.';
+  String _storageMessage =
+      'Allow Android access to browse shared storage such as photos, downloads, and documents. Private app data and protected system files are not accessible.';
   Directory _root = Directory('/storage/emulated/0');
   Directory _current = Directory('/storage/emulated/0');
   List<FileSystemEntity> _items = <FileSystemEntity>[];
@@ -231,7 +232,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
         _checkingPermission = false;
         _storageMessage = status.isGranted
             ? 'All files access is enabled.'
-            : 'Android requires All files access. The system may open a Settings page; enable “Allow access to manage all files”, return to Aqua, then tap Check permission.';
+            : 'To browse shared storage, enable “Allow access to manage all files” in Android settings, then return to Bubble. Android keeps private app data and protected system files inaccessible.';
       });
       if (status.isGranted) {
         await _loadStorageInfo();
