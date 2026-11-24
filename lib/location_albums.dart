@@ -2,13 +2,14 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:exif/exif.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class LocationAlbumsPage extends StatefulWidget {
-  const LocationAlbumsPage({super.key, required this.targetDirectory, required this.accent});
+  const LocationAlbumsPage(
+      {super.key, required this.targetDirectory, required this.accent});
   final Directory targetDirectory;
   final Color accent;
 
@@ -28,7 +29,8 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
     final result = <String, List<_LocatedPhoto>>{};
     for (final photo in _photos) {
       // Three decimal places groups photos within roughly 100 metres.
-      final key = '${photo.latitude.toStringAsFixed(3)}, ${photo.longitude.toStringAsFixed(3)}';
+      final key =
+          '${photo.latitude.toStringAsFixed(3)}, ${photo.longitude.toStringAsFixed(3)}';
       (result[key] ??= <_LocatedPhoto>[]).add(photo);
     }
     return result;
@@ -44,10 +46,12 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
           'To show names such as town or city, this will send the rounded GPS coordinates of each location group to OpenStreetMap Nominatim. It will not upload your photos. Allow up to 30 location lookups, with a short delay between requests?',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Not now')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Allow lookup')),
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Not now')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Allow lookup')),
         ],
       ),
     );
@@ -56,7 +60,8 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
       _lookingUpPlaces = true;
       _status = 'Looking up place names online…';
     });
-    final client = HttpClient()..userAgent = 'BubbleFileManager/0.2.0 (GPS photo location labels)';
+    final client = HttpClient()
+      ..userAgent = 'BubbleFileManager/0.2.0 (GPS photo location labels)';
     var completed = 0;
     try {
       final groups = _groups.entries.toList();
@@ -73,7 +78,8 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
         try {
           final request = await client.getUrl(uri);
           request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-          final response = await request.close().timeout(const Duration(seconds: 12));
+          final response =
+              await request.close().timeout(const Duration(seconds: 12));
           final body = await response.transform(utf8.decoder).join();
           if (response.statusCode == HttpStatus.ok) {
             final decoded = jsonDecode(body);
@@ -81,10 +87,17 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
               final address = decoded['address'];
               String? shortName;
               if (address is Map) {
-                shortName = (address['city'] ?? address['town'] ?? address['village'] ??
-                    address['municipality'] ?? address['suburb'] ?? address['county'])?.toString();
+                shortName = (address['city'] ??
+                        address['town'] ??
+                        address['village'] ??
+                        address['municipality'] ??
+                        address['suburb'] ??
+                        address['county'])
+                    ?.toString();
                 final country = address['country']?.toString();
-                if (shortName != null && country != null && country.isNotEmpty) {
+                if (shortName != null &&
+                    country != null &&
+                    country.isNotEmpty) {
                   shortName = '$shortName, $country';
                 }
               }
@@ -99,7 +112,8 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
         }
         completed++;
         if (mounted) {
-          setState(() => _status = 'Resolved $completed of ${groups.length < 30 ? groups.length : 30} place names…');
+          setState(() => _status =
+              'Resolved $completed of ${groups.length < 30 ? groups.length : 30} place names…');
         }
         // Public Nominatim service policy: do not send requests faster than 1/sec.
         await Future<void>.delayed(const Duration(milliseconds: 1100));
@@ -109,7 +123,8 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
       if (mounted) {
         setState(() {
           _lookingUpPlaces = false;
-          _status = 'Place-name lookup finished. Unresolved groups still show their GPS coordinates.';
+          _status =
+              'Place-name lookup finished. Unresolved groups still show their GPS coordinates.';
         });
       }
     }
@@ -117,15 +132,18 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
 
   double? _coordinate(String? raw, String reference) {
     if (raw == null) return null;
-    final values = RegExp(r'-?\d+(?:\.\d+)?').allMatches(raw)
+    final values = RegExp(r'-?\d+(?:\.\d+)?')
+        .allMatches(raw)
         .map((match) => double.tryParse(match.group(0)!))
-        .whereType<double>().toList();
+        .whereType<double>()
+        .toList();
     if (values.isEmpty) return null;
     final degrees = values[0].abs();
     final minutes = values.length > 1 ? values[1] : 0.0;
     final seconds = values.length > 2 ? values[2] : 0.0;
     var value = degrees + minutes / 60 + seconds / 3600;
-    if (reference.toUpperCase().contains('S') || reference.toUpperCase().contains('W')) {
+    if (reference.toUpperCase().contains('S') ||
+        reference.toUpperCase().contains('W')) {
       value = -value;
     }
     return value;
@@ -152,7 +170,11 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
     });
     final roots = <Directory>[];
     final seenRoots = <String>{};
-    for (final path in <String>[widget.targetDirectory.path, '/storage/emulated/0', '/storage']) {
+    for (final path in <String>[
+      widget.targetDirectory.path,
+      '/storage/emulated/0',
+      '/storage'
+    ]) {
       final root = Directory(path);
       if (await root.exists() && seenRoots.add(root.path)) roots.add(root);
     }
@@ -169,16 +191,23 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
           await for (final entity in directory.list(followLinks: false)) {
             if (entity is Directory) {
               final path = entity.path;
-              final name = entity.uri.pathSegments.isEmpty ? '' : entity.uri.pathSegments.last;
+              final name = entity.uri.pathSegments.isEmpty
+                  ? ''
+                  : entity.uri.pathSegments.last;
               if (name.startsWith('.') ||
                   path.contains('/Android/data') ||
                   path.contains('/Android/obb') ||
                   path.contains('/aqua_encrypted_vault') ||
-                  path.contains('/aqua_recycle_bin')) continue;
+                  path.contains('/aqua_recycle_bin')) {
+                continue;
+              }
               pending.add(entity);
             } else if (entity is File) {
-              final name = entity.uri.pathSegments.isEmpty ? '' : entity.uri.pathSegments.last;
-              final extension = name.contains('.') ? name.split('.').last.toLowerCase() : '';
+              final name = entity.uri.pathSegments.isEmpty
+                  ? ''
+                  : entity.uri.pathSegments.last;
+              final extension =
+                  name.contains('.') ? name.split('.').last.toLowerCase() : '';
               if (!extensions.contains(extension)) continue;
               _checked++;
               if (_checked % 40 == 0 && mounted) {
@@ -187,12 +216,20 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
               try {
                 final length = await entity.length();
                 if (length == 0 || length > 20 * 1024 * 1024) continue;
-                final tags = await readExifFromBytes(await entity.readAsBytes());
+                final tags =
+                    await readExifFromBytes(await entity.readAsBytes());
                 final lat = _coordinate(tags['GPS GPSLatitude']?.printable,
                     tags['GPS GPSLatitudeRef']?.printable ?? 'N');
                 final lon = _coordinate(tags['GPS GPSLongitude']?.printable,
                     tags['GPS GPSLongitudeRef']?.printable ?? 'E');
-                if (lat == null || lon == null || lat < -90 || lat > 90 || lon < -180 || lon > 180) continue;
+                if (lat == null ||
+                    lon == null ||
+                    lat < -90 ||
+                    lat > 90 ||
+                    lon < -180 ||
+                    lon > 180) {
+                  continue;
+                }
                 found.add(_LocatedPhoto(entity, lat, lon));
               } catch (_) {
                 // Ignore unsupported, damaged, or inaccessible images and continue.
@@ -207,7 +244,8 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
       if (!mounted) return;
       setState(() {
         _photos = found;
-        _status = 'Checked $_checked photos. Found GPS details in ${found.length} photos across ${_groups.length} location groups.';
+        _status =
+            'Checked $_checked photos. Found GPS details in ${found.length} photos across ${_groups.length} location groups.';
       });
     } catch (error) {
       if (mounted) setState(() => _status = 'Location scan failed: $error');
@@ -227,9 +265,11 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
           child: Column(children: [
             const Padding(
               padding: EdgeInsets.all(14),
-              child: Text('Photo location map', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              child: Text('Photo location map',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             ),
-            Expanded(child: FlutterMap(
+            Expanded(
+                child: FlutterMap(
               options: MapOptions(
                 initialCenter: LatLng(selected.latitude, selected.longitude),
                 initialZoom: 13,
@@ -239,18 +279,24 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
                   urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                   userAgentPackageName: 'com.aqua.filemanager',
                 ),
-                MarkerLayer(markers: photos.map((photo) => Marker(
-                  point: LatLng(photo.latitude, photo.longitude),
-                  width: 38,
-                  height: 42,
-                  child: Icon(Icons.location_on, color: widget.accent, size: 36),
-                )).toList()),
+                MarkerLayer(
+                    markers: photos
+                        .map((photo) => Marker(
+                              point: LatLng(photo.latitude, photo.longitude),
+                              width: 38,
+                              height: 42,
+                              child: Icon(Icons.location_on,
+                                  color: widget.accent, size: 36),
+                            ))
+                        .toList()),
               ],
             )),
             const Padding(
               padding: EdgeInsets.all(10),
-              child: Text('Map tiles © OpenStreetMap contributors. Exact coordinates remain in this app; place-name lookup is optional.',
-                textAlign: TextAlign.center, style: TextStyle(fontSize: 10, color: Colors.white60)),
+              child: Text(
+                  'Map tiles © OpenStreetMap contributors. Exact coordinates remain in this app; place-name lookup is optional.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 10, color: Colors.white60)),
             ),
           ]),
         ),
@@ -260,102 +306,133 @@ class _LocationAlbumsPageState extends State<LocationAlbumsPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFF071E2A),
-    appBar: AppBar(
-      title: const Text('Location Albums'),
-      backgroundColor: Colors.transparent,
-      actions: [
-        IconButton(
-          tooltip: 'Scan photos',
-          onPressed: _scanning ? null : _scan,
-          icon: const Icon(Icons.refresh),
+        backgroundColor: const Color(0xFF071E2A),
+        appBar: AppBar(
+          title: const Text('Location Albums'),
+          backgroundColor: Colors.transparent,
+          actions: [
+            IconButton(
+              tooltip: 'Scan photos',
+              onPressed: _scanning ? null : _scan,
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
         ),
-      ],
-    ),
-    body: ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Card(
-          color: const Color(0xFF12313F),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Icon(Icons.location_on_rounded, color: widget.accent, size: 28),
-                const SizedBox(width: 10),
-                const Expanded(child: Text('Find photos by captured location',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-              ]),
-              const SizedBox(height: 8),
-              const Text('Uses GPS coordinates embedded in photo metadata. Photos without GPS data cannot be assigned a real location.',
-                style: TextStyle(color: Colors.white70, fontSize: 12)),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: _scanning ? null : _scan,
-                icon: const Icon(Icons.travel_explore),
-                label: Text(_scanning ? 'Scanning…' : 'Scan phone photos'),
-              ),
-              if (_scanning) const Padding(
-                padding: EdgeInsets.only(top: 10),
-                child: LinearProgressIndicator(),
-              ),
-              const SizedBox(height: 8),
-              Text(_status, style: const TextStyle(color: Colors.white70, fontSize: 12)),
-              const SizedBox(height: 5),
-              const Text('Privacy: GPS metadata is processed locally. Opening the map loads map tiles from OpenStreetMap.',
-                style: TextStyle(color: Colors.white54, fontSize: 10)),
-            ]),
-          ),
-        ),
-        const SizedBox(height: 12),
-        if (_groups.isNotEmpty) ...[
-          Text('PLACES FOUND • ${_groups.length}', style: const TextStyle(
-            letterSpacing: 1.4, color: Colors.white70, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _lookingUpPlaces ? null : _lookupPlaceNames,
-            icon: const Icon(Icons.public),
-            label: Text(_lookingUpPlaces ? 'Finding place names…' : 'Find place names online (optional)'),
-          ),
-          ..._groups.entries.map((entry) {
-            final photos = entry.value;
-            final first = photos.first;
-            return Card(
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Card(
               color: const Color(0xFF12313F),
-              child: ExpansionTile(
-                leading: Icon(Icons.place_rounded, color: widget.accent),
-                title: Text(_placeNames[entry.key] ?? 'Location group • ${photos.length} photo(s)'),
-                subtitle: Text('${_placeNames.containsKey(entry.key) ? entry.key + ' • ' : ''}${photos.length} photo(s)', style: const TextStyle(color: Colors.white60)),
-                trailing: IconButton(
-                  tooltip: 'Show this group on map',
-                  onPressed: () => _showMap(first, photos),
-                  icon: const Icon(Icons.map_outlined),
-                ),
-                children: photos.map((photo) => ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.photo_outlined, color: Colors.white70),
-                  title: Text(photo.file.uri.pathSegments.last,
-                    maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: Text(photo.file.parent.path,
-                    maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 10, color: Colors.white54)),
-                  trailing: IconButton(
-                    tooltip: 'Show photo location',
-                    onPressed: () => _showMap(photo, <_LocatedPhoto>[photo]),
-                    icon: const Icon(Icons.location_searching),
-                  ),
-                )).toList(),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        Icon(Icons.location_on_rounded,
+                            color: widget.accent, size: 28),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                            child: Text('Find photos by captured location',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16))),
+                      ]),
+                      const SizedBox(height: 8),
+                      const Text(
+                          'Uses GPS coordinates embedded in photo metadata. Photos without GPS data cannot be assigned a real location.',
+                          style:
+                              TextStyle(color: Colors.white70, fontSize: 12)),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: _scanning ? null : _scan,
+                        icon: const Icon(Icons.travel_explore),
+                        label:
+                            Text(_scanning ? 'Scanning…' : 'Scan phone photos'),
+                      ),
+                      if (_scanning)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 10),
+                          child: LinearProgressIndicator(),
+                        ),
+                      const SizedBox(height: 8),
+                      Text(_status,
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 12)),
+                      const SizedBox(height: 5),
+                      const Text(
+                          'Privacy: GPS metadata is processed locally. Opening the map loads map tiles from OpenStreetMap.',
+                          style:
+                              TextStyle(color: Colors.white54, fontSize: 10)),
+                    ]),
               ),
-            );
-          }),
-        ] else if (!_scanning) const Padding(
-          padding: EdgeInsets.all(22),
-          child: Text('No location albums yet. Scan your photos to look for GPS metadata.',
-            textAlign: TextAlign.center, style: TextStyle(color: Colors.white54)),
+            ),
+            const SizedBox(height: 12),
+            if (_groups.isNotEmpty) ...[
+              Text('PLACES FOUND • ${_groups.length}',
+                  style: const TextStyle(
+                      letterSpacing: 1.4,
+                      color: Colors.white70,
+                      fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _lookingUpPlaces ? null : _lookupPlaceNames,
+                icon: const Icon(Icons.public),
+                label: Text(_lookingUpPlaces
+                    ? 'Finding place names…'
+                    : 'Find place names online (optional)'),
+              ),
+              ..._groups.entries.map((entry) {
+                final photos = entry.value;
+                final first = photos.first;
+                return Card(
+                  color: const Color(0xFF12313F),
+                  child: ExpansionTile(
+                    leading: Icon(Icons.place_rounded, color: widget.accent),
+                    title: Text(_placeNames[entry.key] ??
+                        'Location group • ${photos.length} photo(s)'),
+                    subtitle: Text(
+                        '${_placeNames.containsKey(entry.key) ? '${entry.key} • ' : ''}${photos.length} photo(s)',
+                        style: const TextStyle(color: Colors.white60)),
+                    trailing: IconButton(
+                      tooltip: 'Show this group on map',
+                      onPressed: () => _showMap(first, photos),
+                      icon: const Icon(Icons.map_outlined),
+                    ),
+                    children: photos
+                        .map((photo) => ListTile(
+                              dense: true,
+                              leading: const Icon(Icons.photo_outlined,
+                                  color: Colors.white70),
+                              title: Text(photo.file.uri.pathSegments.last,
+                                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                              subtitle: Text(photo.file.parent.path,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 10, color: Colors.white54)),
+                              trailing: IconButton(
+                                tooltip: 'Show photo location',
+                                onPressed: () =>
+                                    _showMap(photo, <_LocatedPhoto>[photo]),
+                                icon: const Icon(Icons.location_searching),
+                              ),
+                            ))
+                        .toList(),
+                  ),
+                );
+              }),
+            ] else if (!_scanning)
+              const Padding(
+                padding: EdgeInsets.all(22),
+                child: Text(
+                    'No location albums yet. Scan your photos to look for GPS metadata.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white54)),
+              ),
+          ],
         ),
-      ],
-    ),
-  );
+      );
 }
 
 class _LocatedPhoto {

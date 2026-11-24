@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:face_detection_tflite/face_detection_tflite.dart' as face_ml;
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -31,12 +31,13 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
   static const double _minimumMatchMargin = 0.08;
 
   bool _busy = false;
-  String _status = 'Scan your accessible photo folders to create private, on-device people albums.';
+  String _status =
+      'Scan your accessible photo folders to create private, on-device people albums.';
   double _progress = 0;
   int _processed = 0;
   int _skipped = 0;
   List<_PersonCluster> _groups = <_PersonCluster>[];
-  final List<({ _PersonCluster group, String path })> _undoRemovals = [];
+  final List<({_PersonCluster group, String path})> _undoRemovals = [];
 
   bool _isImage(String path) {
     final lower = path.toLowerCase();
@@ -145,13 +146,15 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
           permission = await Permission.manageExternalStorage.request();
         }
         if (!permission.isGranted) {
-          throw StateError('Allow “All files access” in Android Settings, then try again.');
+          throw StateError(
+              'Allow “All files access” in Android Settings, then try again.');
         }
       }
 
       final images = await _collectImages();
       if (images.isEmpty) {
-        throw StateError('No supported photos were found in folders this app can access.');
+        throw StateError(
+            'No supported photos were found in folders this app can access.');
       }
 
       if (mounted) {
@@ -186,7 +189,8 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
                 final cluster = clusters[i];
                 var score = -1.0;
                 for (final sample in cluster.samples) {
-                  score = math.max(score, _cosine(sample, embedding)).toDouble();
+                  score =
+                      math.max(score, _cosine(sample, embedding)).toDouble();
                 }
                 if (score > bestScore) {
                   secondScore = bestScore;
@@ -199,7 +203,8 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
 
               if (bestIndex >= 0 &&
                   bestScore >= _matchThreshold &&
-                  (secondScore < 0 || bestScore - secondScore >= _minimumMatchMargin)) {
+                  (secondScore < 0 ||
+                      bestScore - secondScore >= _minimumMatchMargin)) {
                 final cluster = clusters[bestIndex];
                 if (cluster.samples.length < 6) {
                   cluster.samples.add(List<double>.from(embedding));
@@ -239,26 +244,35 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
         setState(() {
           _groups = clusters;
           _progress = 1;
-          _status = 'Finished: ${clusters.length} possible people groups from ${_processed} photos. Review groups before relying on matches.';
+          _status =
+              'Finished: ${clusters.length} possible people groups from $_processed photos. Review groups before relying on matches.';
         });
       }
     } catch (error) {
-      if (mounted) setState(() => _status = 'Face scan could not finish: $error');
+      if (mounted) {
+        setState(() => _status = 'Face scan could not finish: $error');
+      }
     } finally {
       await detector?.dispose();
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _removeFromGroup(_PersonCluster group, String path, StateSetter sheetSetState) async {
+  Future<void> _removeFromGroup(
+      _PersonCluster group, String path, StateSetter sheetSetState) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Remove from this album?'),
-        content: const Text('This only removes the photo from this temporary face group. The original photo will stay on your phone and will not be deleted.'),
+        content: const Text(
+            'This only removes the photo from this temporary face group. The original photo will stay on your phone and will not be deleted.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Remove')),
+          TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Remove')),
         ],
       ),
     );
@@ -290,79 +304,84 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
       backgroundColor: const Color(0xFF102B38),
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, sheetSetState) => SafeArea(
-        child: SizedBox(
-          height: MediaQuery.of(sheetContext).size.height * .78,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
-                child: Text(
-                  'Possible person ${index + 1} • ${group.paths.length} photo(s)',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 18),
-                child: Text(
-                  'These photos look similar to the on-device model. Check them yourself; incorrect matches are possible.',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Expanded(
-                child: GridView.builder(
-                  padding: const EdgeInsets.all(12),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    crossAxisSpacing: 8,
-                    mainAxisSpacing: 8,
+          child: SizedBox(
+            height: MediaQuery.of(sheetContext).size.height * .78,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+                  child: Text(
+                    'Possible person ${index + 1} • ${group.paths.length} photo(s)',
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w700),
                   ),
-                  itemCount: group.paths.length,
-                  itemBuilder: (context, i) {
-                    final path = group.paths[i];
-                    return Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        InkWell(
-                          onTap: () => OpenFilex.open(path),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: Image.file(
-                              File(path),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const ColoredBox(
-                                color: Color(0xFF244653),
-                                child: Icon(Icons.broken_image_outlined),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 18),
+                  child: Text(
+                    'These photos look similar to the on-device model. Check them yourself; incorrect matches are possible.',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: GridView.builder(
+                    padding: const EdgeInsets.all(12),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                    ),
+                    itemCount: group.paths.length,
+                    itemBuilder: (context, i) {
+                      final path = group.paths[i];
+                      return Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          InkWell(
+                            onTap: () => OpenFilex.open(path),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Image.file(
+                                File(path),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const ColoredBox(
+                                  color: Color(0xFF244653),
+                                  child: Icon(Icons.broken_image_outlined),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                        Positioned(
-                          top: 2,
-                          right: 2,
-                          child: Material(
-                            color: Colors.black.withValues(alpha: .65),
-                            shape: const CircleBorder(),
-                            child: IconButton(
-                              tooltip: 'Remove from this album',
-                              visualDensity: VisualDensity.compact,
-                              constraints: const BoxConstraints.tightFor(width: 34, height: 34),
-                              padding: EdgeInsets.zero,
-                              icon: const Icon(Icons.close, size: 18, color: Colors.white),
-                              onPressed: () => _removeFromGroup(group, path, sheetSetState),
+                          Positioned(
+                            top: 2,
+                            right: 2,
+                            child: Material(
+                              color: Colors.black.withValues(alpha: .65),
+                              shape: const CircleBorder(),
+                              child: IconButton(
+                                tooltip: 'Remove from this album',
+                                visualDensity: VisualDensity.compact,
+                                constraints: const BoxConstraints.tightFor(
+                                    width: 34, height: 34),
+                                padding: EdgeInsets.zero,
+                                icon: const Icon(Icons.close,
+                                    size: 18, color: Colors.white),
+                                onPressed: () => _removeFromGroup(
+                                    group, path, sheetSetState),
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    );
-                  },
+                        ],
+                      );
+                    },
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -395,17 +414,20 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
           ),
           if (_busy) ...[
             const SizedBox(height: 12),
-            LinearProgressIndicator(value: _progress == 0 ? null : _progress, color: widget.accent),
+            LinearProgressIndicator(
+                value: _progress == 0 ? null : _progress, color: widget.accent),
             const SizedBox(height: 6),
-            Text('${(_progress * 100).round()}% • $_processed scanned • $_skipped skipped',
-              style: const TextStyle(color: Colors.white60, fontSize: 11)),
+            Text(
+                '${(_progress * 100).round()}% • $_processed scanned • $_skipped skipped',
+                style: const TextStyle(color: Colors.white60, fontSize: 11)),
           ],
           const SizedBox(height: 12),
-          Text(_status, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+          Text(_status,
+              style: const TextStyle(color: Colors.white70, fontSize: 12)),
           if (!_busy && _groups.isNotEmpty) ...[
             const SizedBox(height: 12),
             Text('Possible people • ${_groups.length}',
-              style: const TextStyle(fontWeight: FontWeight.w800)),
+                style: const TextStyle(fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),
             ..._groups.asMap().entries.map((entry) {
               final index = entry.key;
@@ -422,12 +444,14 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
                       child: Image.file(
                         File(firstPath),
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Icon(Icons.face, color: widget.accent),
+                        errorBuilder: (_, __, ___) =>
+                            Icon(Icons.face, color: widget.accent),
                       ),
                     ),
                   ),
                   title: Text('Person group ${index + 1}'),
-                  subtitle: Text('${group.paths.length} photo(s) • Tap to review'),
+                  subtitle:
+                      Text('${group.paths.length} photo(s) • Tap to review'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _showGroup(group, index),
                 ),
@@ -442,11 +466,13 @@ class _FaceAlbumsPageState extends State<FaceAlbumsPage> {
             ),
           if (_groups.isNotEmpty)
             TextButton.icon(
-              onPressed: _busy ? null : () => setState(() {
-                _groups = <_PersonCluster>[];
-                _undoRemovals.clear();
-                _status = 'Temporary face groups cleared from memory.';
-              }),
+              onPressed: _busy
+                  ? null
+                  : () => setState(() {
+                        _groups = <_PersonCluster>[];
+                        _undoRemovals.clear();
+                        _status = 'Temporary face groups cleared from memory.';
+                      }),
               icon: const Icon(Icons.delete_outline),
               label: const Text('Clear temporary groups'),
             ),

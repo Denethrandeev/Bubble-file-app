@@ -1,5 +1,5 @@
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() => runApp(const AquaApp());
 
@@ -73,7 +73,8 @@ class _AquaAppState extends State<AquaApp> {
                   FilledButton.icon(
                     onPressed: _isPickingFiles ? null : _pickFiles,
                     icon: const Icon(Icons.upload_file),
-                    label: Text(_isPickingFiles ? 'Opening files…' : 'Select files'),
+                    label: Text(
+                        _isPickingFiles ? 'Opening files…' : 'Select files'),
                   ),
                   const SizedBox(height: 16),
                   Text('${_files.length} selected file(s)'),
@@ -86,13 +87,15 @@ class _AquaAppState extends State<AquaApp> {
                             itemBuilder: (context, index) {
                               final file = _files[index];
                               return ListTile(
-                                leading: const Icon(Icons.insert_drive_file_outlined),
+                                leading: const Icon(
+                                    Icons.insert_drive_file_outlined),
                                 title: Text(file.name),
                                 subtitle: Text(_formatSize(file.size)),
                                 trailing: IconButton(
                                   tooltip: 'Remove ${file.name}',
                                   icon: const Icon(Icons.close),
-                                  onPressed: () => setState(() => _files.removeAt(index)),
+                                  onPressed: () =>
+                                      setState(() => _files.removeAt(index)),
                                 ),
                               );
                             },

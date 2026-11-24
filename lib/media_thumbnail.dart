@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:media_metadata/media_metadata.dart';
 
 /// Lightweight file-list preview. Metadata is read once per visible tile and
@@ -32,17 +32,39 @@ class _MediaThumbnailState extends State<MediaThumbnail> {
   }
 
   bool get _isAudio => const {
-    'mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg', 'opus', 'wma',
-  }.contains(_extension);
+        'mp3',
+        'wav',
+        'm4a',
+        'aac',
+        'flac',
+        'ogg',
+        'opus',
+        'wma',
+      }.contains(_extension);
 
   bool get _isVideo => const {
-    'mp4', 'mkv', 'mov', 'webm', '3gp', '3gpp', 'avi', 'm4v',
-  }.contains(_extension);
+        'mp4',
+        'mkv',
+        'mov',
+        'webm',
+        '3gp',
+        '3gpp',
+        'avi',
+        'm4v',
+      }.contains(_extension);
 
   bool get _isImage => const {
-    'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'heic', 'heif',
-    'tif', 'tiff',
-  }.contains(_extension);
+        'jpg',
+        'jpeg',
+        'png',
+        'gif',
+        'webp',
+        'bmp',
+        'heic',
+        'heif',
+        'tif',
+        'tiff',
+      }.contains(_extension);
 
   @override
   void initState() {
@@ -68,46 +90,47 @@ class _MediaThumbnailState extends State<MediaThumbnail> {
   }
 
   Widget _fallback(IconData icon) => Container(
-    width: widget.size,
-    height: widget.size,
-    decoration: BoxDecoration(
-      borderRadius: BorderRadius.circular(13),
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          widget.accent.withOpacity(.30),
-          const Color(0xFF102B38),
-        ],
-      ),
-      border: Border.all(color: widget.accent.withOpacity(.28)),
-    ),
-    child: Icon(icon, color: widget.accent, size: widget.size * .48),
-  );
+        width: widget.size,
+        height: widget.size,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(13),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              widget.accent.withValues(alpha: .30),
+              const Color(0xFF102B38),
+            ],
+          ),
+          border: Border.all(color: widget.accent.withValues(alpha: .28)),
+        ),
+        child: Icon(icon, color: widget.accent, size: widget.size * .48),
+      );
 
   Widget _image(Uint8List bytes, {bool video = false}) => ClipRRect(
-    borderRadius: BorderRadius.circular(13),
-    child: SizedBox(
-      width: widget.size,
-      height: widget.size,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.memory(bytes, fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => _fallback(
-              video ? Icons.movie_rounded : Icons.music_note_rounded,
-            )),
-          if (video)
-            Container(
-              color: Colors.black.withOpacity(.16),
-              alignment: Alignment.center,
-              child: const Icon(Icons.play_circle_fill_rounded,
-                color: Colors.white, size: 23),
-            ),
-        ],
-      ),
-    ),
-  );
+        borderRadius: BorderRadius.circular(13),
+        child: SizedBox(
+          width: widget.size,
+          height: widget.size,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.memory(bytes,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _fallback(
+                        video ? Icons.movie_rounded : Icons.music_note_rounded,
+                      )),
+              if (video)
+                Container(
+                  color: Colors.black.withValues(alpha: .16),
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.play_circle_fill_rounded,
+                      color: Colors.white, size: 23),
+                ),
+            ],
+          ),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -140,8 +163,11 @@ class _MediaThumbnailState extends State<MediaThumbnail> {
           return _image(art, video: _isVideo);
         }
         return _fallback(
-          _isVideo ? Icons.movie_rounded :
-          (_isAudio ? Icons.water_drop_rounded : Icons.insert_drive_file_rounded),
+          _isVideo
+              ? Icons.movie_rounded
+              : (_isAudio
+                  ? Icons.water_drop_rounded
+                  : Icons.insert_drive_file_rounded),
         );
       },
     );

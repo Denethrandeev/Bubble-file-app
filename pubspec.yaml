@@ -29,6 +29,7 @@ dependencies:
   latlong2: ^0.9.1
   face_detection_tflite: ^6.10.1
 
+  material_ui: ^1.11.1
 dev_dependencies:
   flutter_test:
     sdk: flutter

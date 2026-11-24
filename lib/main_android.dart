@@ -11,7 +11,7 @@ import 'location_albums.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:crypto/crypto.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sensors_plus/sensors_plus.dart';
@@ -31,9 +31,9 @@ const List<Color> aquaAccents = <Color>[
   Color(0xFFFF83C5),
 ];
 
-
 class _LiquidSurfacePainter extends CustomPainter {
-  const _LiquidSurfacePainter({required this.accent, required this.tilt, required this.enabled});
+  const _LiquidSurfacePainter(
+      {required this.accent, required this.tilt, required this.enabled});
   final Color accent;
   final Offset tilt;
   final bool enabled;
@@ -53,14 +53,19 @@ class _LiquidSurfacePainter extends CustomPainter {
       ..lineTo(size.width, size.height)
       ..lineTo(0, size.height)
       ..close();
-    canvas.drawPath(path, Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [accent.withOpacity(.16), accent.withOpacity(.30)],
-      ).createShader(Offset.zero & size));
+    canvas.drawPath(
+        path,
+        Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              accent.withValues(alpha: .16),
+              accent.withValues(alpha: .30)
+            ],
+          ).createShader(Offset.zero & size));
     final shine = Paint()
-      ..color = accent.withOpacity(.52)
+      ..color = accent.withValues(alpha: .52)
       ..strokeWidth = 1.1
       ..style = PaintingStyle.stroke;
     final surface = Path()..moveTo(0, base + slope * size.height);
@@ -74,7 +79,7 @@ class _LiquidSurfacePainter extends CustomPainter {
       final x = size.width * (.28 + i * .43) + (enabled ? tilt.dx * 3 : 0);
       final y = size.height * (.955 - i * .018) + (enabled ? tilt.dy * 2 : 0);
       canvas.drawCircle(Offset(x, y), size.width * (.009 + i * .003),
-        Paint()..color = Colors.white.withOpacity(.36));
+          Paint()..color = Colors.white.withValues(alpha: .36));
     }
   }
 
@@ -108,27 +113,35 @@ class _StorageDropPainter extends CustomPainter {
           size.height * .22, size.width * .5, size.height * .04)
       ..close();
 
-    canvas.drawPath(path, Paint()
-      ..color = Colors.white.withOpacity(.10)
-      ..style = PaintingStyle.fill);
+    canvas.drawPath(
+        path,
+        Paint()
+          ..color = Colors.white.withValues(alpha: .10)
+          ..style = PaintingStyle.fill);
     canvas.save();
     canvas.clipPath(path);
     if (active) {
       final top = size.height * (1 - fraction.clamp(0.0, 1.0));
-      canvas.drawRect(Rect.fromLTRB(0, top, size.width, size.height),
-        Paint()..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [color.withOpacity(.55), color],
-        ).createShader(Offset.zero & size));
+      canvas.drawRect(
+          Rect.fromLTRB(0, top, size.width, size.height),
+          Paint()
+            ..shader = LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [color.withValues(alpha: .55), color],
+            ).createShader(Offset.zero & size));
     }
     canvas.restore();
-    canvas.drawPath(path, Paint()
-      ..color = color.withOpacity(.9)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.7);
-    canvas.drawCircle(Offset(size.width * .35, size.height * .45),
-      size.width * .055, Paint()..color = Colors.white.withOpacity(.65));
+    canvas.drawPath(
+        path,
+        Paint()
+          ..color = color.withValues(alpha: .9)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.7);
+    canvas.drawCircle(
+        Offset(size.width * .35, size.height * .45),
+        size.width * .055,
+        Paint()..color = Colors.white.withValues(alpha: .65));
   }
 
   @override
@@ -193,8 +206,11 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   Color get _accent => aquaAccents[_theme];
 
   Future<int> _androidSdkInt() async {
-    final sdkInt = await const MethodChannel('aqua/storage').invokeMethod<int>('sdkInt');
-    if (sdkInt == null) throw StateError('Android did not report its SDK version.');
+    final sdkInt =
+        await const MethodChannel('aqua/storage').invokeMethod<int>('sdkInt');
+    if (sdkInt == null) {
+      throw StateError('Android did not report its SDK version.');
+    }
     return sdkInt;
   }
 
@@ -217,7 +233,8 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   }
 
   bool _showSplash = true;
-  final GlobalKey<_BubbleFieldState> _bubbleFieldKey = GlobalKey<_BubbleFieldState>();
+  final GlobalKey<_BubbleFieldState> _bubbleFieldKey =
+      GlobalKey<_BubbleFieldState>();
 
   @override
   void initState() {
@@ -244,7 +261,8 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
 
   Future<void> _requestStorage() async {
     if (!Platform.isAndroid) {
-      setState(() => _storageMessage = 'This build currently targets Android storage.');
+      setState(() =>
+          _storageMessage = 'This build currently targets Android storage.');
       return;
     }
     if (mounted) setState(() => _checkingPermission = true);
@@ -280,7 +298,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() {
         _checkingPermission = false;
-        _storageMessage = 'Could not request storage access: ' + e.toString();
+        _storageMessage = 'Could not request storage access: $e';
       });
     }
   }
@@ -304,9 +322,12 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       final values = await const MethodChannel('aqua/storage')
           .invokeListMethod<dynamic>('storageVolumes');
       if (!mounted || values == null) return;
-      final volumes = values.whereType<Map>().map((value) =>
-          Map<String, dynamic>.from(value)).where((value) =>
-          value['path'] is String && (value['total'] as num? ?? 0) > 0).toList();
+      final volumes = values
+          .whereType<Map>()
+          .map((value) => Map<String, dynamic>.from(value))
+          .where((value) =>
+              value['path'] is String && (value['total'] as num? ?? 0) > 0)
+          .toList();
       if (!mounted) return;
       setState(() => _storageVolumes = volumes);
     } catch (_) {
@@ -330,26 +351,34 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
     final path = volume['path'] as String? ?? '';
     final total = (volume['total'] as num?)?.toInt() ?? 0;
     final free = (volume['free'] as num?)?.toInt() ?? 0;
-    final used = total <= 0 ? 0.0 : ((total - free) / total).clamp(0.0, 1.0).toDouble();
+    final used =
+        total <= 0 ? 0.0 : ((total - free) / total).clamp(0.0, 1.0).toDouble();
     final removable = volume['removable'] == true;
     final label = removable ? 'EXTERNAL' : 'INTERNAL';
     final selected = _root.path == path;
     final color = _volumeStatusColor(used);
     return InkWell(
-      onTap: path.isEmpty ? null : () {
-        final directory = Directory(path);
-        setState(() => _root = directory);
-        _loadDirectory(directory);
-        _selectTab(1);
-      },
+      onTap: path.isEmpty
+          ? null
+          : () {
+              final directory = Directory(path);
+              setState(() => _root = directory);
+              _loadDirectory(directory);
+              _selectTab(1);
+            },
       borderRadius: BorderRadius.circular(18),
       child: Container(
         width: 142,
         padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? _accent.withOpacity(.12) : Colors.white.withOpacity(.035),
+          color: selected
+              ? _accent.withValues(alpha: .12)
+              : Colors.white.withValues(alpha: .035),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: selected ? _accent.withOpacity(.65) : Colors.white.withOpacity(.10)),
+          border: Border.all(
+              color: selected
+                  ? _accent.withValues(alpha: .65)
+                  : Colors.white.withValues(alpha: .10)),
         ),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           CustomPaint(
@@ -361,15 +390,23 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
             ),
           ),
           const SizedBox(height: 7),
-          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 9, letterSpacing: 1.1, color: color, fontWeight: FontWeight.w800)),
+          Text(label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 9,
+                  letterSpacing: 1.1,
+                  color: color,
+                  fontWeight: FontWeight.w800)),
           Text('${(used * 100).round()}% used',
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+              style:
+                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
           Text('${_formatBytes(total - free)} / ${_formatBytes(total)}',
-            maxLines: 1, overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 9, color: Colors.white60)),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 9, color: Colors.white60)),
           Text(removable ? 'SD / USB' : 'Phone',
-            style: const TextStyle(fontSize: 9, color: Colors.white38)),
+              style: const TextStyle(fontSize: 9, color: Colors.white38)),
         ]),
       ),
     );
@@ -398,7 +435,10 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       if (await index.exists()) {
         final decoded = jsonDecode(await index.readAsString());
         if (decoded is List) {
-          records = decoded.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+          records = decoded
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList();
         }
       }
       if (!mounted) return;
@@ -409,9 +449,10 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       });
       await _expireRecycleRecords();
       _recycleTimer?.cancel();
-      _recycleTimer = Timer.periodic(const Duration(minutes: 1), (_) => _expireRecycleRecords());
+      _recycleTimer = Timer.periodic(
+          const Duration(minutes: 1), (_) => _expireRecycleRecords());
     } catch (e) {
-      _message('Recycle Bin could not be initialized: ' + e.toString());
+      _message('Recycle Bin could not be initialized: $e');
     }
   }
 
@@ -470,7 +511,8 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _copyEntityRecursively(FileSystemEntity source, String targetPath) async {
+  Future<void> _copyEntityRecursively(
+      FileSystemEntity source, String targetPath) async {
     if (source is File) {
       await source.copy(targetPath);
       return;
@@ -487,7 +529,8 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
     throw FileSystemException('Unsupported file-system item', source.path);
   }
 
-  Future<void> _moveEntityToClipboard(FileSystemEntity entity, {required bool move}) async {
+  Future<void> _moveEntityToClipboard(FileSystemEntity entity,
+      {required bool move}) async {
     setState(() {
       _clipboardEntity = entity;
       _clipboardMove = move;
@@ -507,11 +550,16 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
     try {
       await _copyEntityRecursively(source, target);
       if (wasMove) await _deleteEntityPermanently(source.path);
-      if (mounted) setState(() { _clipboardEntity = null; _clipboardMove = false; });
+      if (mounted) {
+        setState(() {
+          _clipboardEntity = null;
+          _clipboardMove = false;
+        });
+      }
       await _loadDirectory(_current);
       _message(wasMove ? 'Moved successfully.' : 'Copied successfully.');
     } catch (e) {
-      _message('Copy or move failed: ' + e.toString());
+      _message('Copy or move failed: $e');
     }
   }
 
@@ -553,7 +601,8 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       } catch (deleteError) {
         // The recovery copy is retained and can still be restored.
         await _loadDirectory(_current);
-        _message('A recovery copy was saved in Recycle Bin, but the original could not be fully removed: $deleteError');
+        _message(
+            'A recovery copy was saved in Recycle Bin, but the original could not be fully removed: $deleteError');
       }
     } catch (e) {
       final recorded = _recycleRecords.any((item) => item['id'] == id);
@@ -571,13 +620,15 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       var destination = record['originalPath'] as String;
       final parent = Directory(File(destination).parent.path);
       await parent.create(recursive: true);
-      if (await FileSystemEntity.type(destination) != FileSystemEntityType.notFound) {
+      if (await FileSystemEntity.type(destination) !=
+          FileSystemEntityType.notFound) {
         final base = destination;
         var suffix = 1;
         do {
           destination = '$base (restored $suffix)';
           suffix++;
-        } while (await FileSystemEntity.type(destination) != FileSystemEntityType.notFound);
+        } while (await FileSystemEntity.type(destination) !=
+            FileSystemEntityType.notFound);
       }
       final sourcePath = record['storedPath'] as String;
       final type = await FileSystemEntity.type(sourcePath, followLinks: false);
@@ -587,12 +638,13 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
         await File(sourcePath).copy(destination);
       }
       await _deleteEntityPermanently(sourcePath);
-      setState(() => _recycleRecords.removeWhere((item) => item['id'] == record['id']));
+      setState(() =>
+          _recycleRecords.removeWhere((item) => item['id'] == record['id']));
       await _saveRecycleRecords();
       _message('File restored.');
       if (_hasStorage) await _loadDirectory(_current);
     } catch (e) {
-      _message('Restore failed: ' + e.toString());
+      _message('Restore failed: $e');
     }
   }
 
@@ -611,17 +663,22 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
         record['stage'] = oldStage;
         record['stageStartedAt'] = oldStarted;
       });
-      _message('Could not save the recovery timer; item remains in Recycle Bin: $e');
+      _message(
+          'Could not save the recovery timer; item remains in Recycle Bin: $e');
     }
   }
 
   String _remainingTime(Map<String, dynamic> record) {
     final started = (record['stageStartedAt'] as num?)?.toInt() ?? 0;
     final stage = record['stage'] as String? ?? 'bin';
-    final duration = stage == 'shred' ? const Duration(hours: 2) : const Duration(days: 30);
-    final remaining = duration - DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(started));
+    final duration =
+        stage == 'shred' ? const Duration(hours: 2) : const Duration(days: 30);
+    final remaining = duration -
+        DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(started));
     if (remaining.isNegative) return 'Expiring…';
-    if (stage == 'shred') return '${remaining.inHours}h ${remaining.inMinutes.remainder(60)}m left';
+    if (stage == 'shred') {
+      return '${remaining.inHours}h ${remaining.inMinutes.remainder(60)}m left';
+    }
     return '${remaining.inDays}d ${remaining.inHours.remainder(24)}h left';
   }
 
@@ -636,7 +693,8 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
           if (entry.path == '/storage/emulated') {
             final internal = Directory('/storage/emulated/0');
             if (await internal.exists()) found.add(internal.path);
-          } else if (!entry.path.endsWith('/self') && !entry.path.endsWith('/emulated')) {
+          } else if (!entry.path.endsWith('/self') &&
+              !entry.path.endsWith('/emulated')) {
             found.add(entry.path);
           }
         }
@@ -665,7 +723,8 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
     } catch (e) {
       if (!mounted) return;
       final path = directory.path.toLowerCase();
-      final message = path.contains('/android/data') || path.contains('/android/obb')
+      final message = path.contains('/android/data') ||
+              path.contains('/android/obb')
           ? 'Android protects “${_nameOf(directory)}” from file managers. Choose an accessible folder or use Android’s system picker for individual files.'
           : e.toString().toLowerCase().contains('permission')
               ? 'Android denied access to “${_nameOf(directory)}”. It may be protected; choose another folder or use the system picker.'
@@ -680,11 +739,13 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
 
   Future<void> _openQuickFolder(String label, List<String> names) async {
     if (!_hasStorage) {
-      _message('Allow All files access or choose individual files with Android’s system picker.');
+      _message(
+          'Allow All files access or choose individual files with Android’s system picker.');
       return;
     }
     for (final name in names) {
-      final directory = Directory('${_root.path}${Platform.pathSeparator}$name');
+      final directory =
+          Directory('${_root.path}${Platform.pathSeparator}$name');
       if (await directory.exists()) {
         setState(() {
           _fileCategory = 'All files';
@@ -705,14 +766,17 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
         withData: false,
       );
       if (result == null) return;
-      final accessible = result.files.where((file) => file.path != null).toList();
+      final accessible =
+          result.files.where((file) => file.path != null).toList();
       if (accessible.isEmpty) {
-        _message('Android did not provide readable file paths. Try a different file or allow All files access.');
+        _message(
+            'Android did not provide readable file paths. Try a different file or allow All files access.');
         return;
       }
       if (!mounted) return;
       setState(() => _pickerFiles = accessible);
-      _message('${accessible.length} selected file${accessible.length == 1 ? '' : 's'} are available below.');
+      _message(
+          '${accessible.length} selected file${accessible.length == 1 ? '' : 's'} are available below.');
     } catch (error) {
       _message('Could not open Android’s file picker: $error');
     }
@@ -773,13 +837,16 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
           normalized.contains('/android/obb') ||
           normalized.contains('/.') ||
           normalized.contains('/aqua_recycle_bin') ||
-          normalized.contains('/vault')) continue;
+          normalized.contains('/vault')) {
+        continue;
+      }
       try {
         await for (final entity in directory.list(followLinks: false)) {
           visited++;
           if (entity is Directory) {
             final name = _nameOf(entity);
-            if (!name.startsWith('.') && !entity.path.toLowerCase().contains('/android/data') &&
+            if (!name.startsWith('.') &&
+                !entity.path.toLowerCase().contains('/android/data') &&
                 !entity.path.toLowerCase().contains('/android/obb')) {
               pending.add(entity);
             }
@@ -806,13 +873,45 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
     final ext = _extensionOf(item);
     switch (_fileCategory) {
       case 'Images':
-        return <String>{'jpg','jpeg','png','gif','webp','bmp','heic','heif','tif','tiff'}.contains(ext);
+        return <String>{
+          'jpg',
+          'jpeg',
+          'png',
+          'gif',
+          'webp',
+          'bmp',
+          'heic',
+          'heif',
+          'tif',
+          'tiff'
+        }.contains(ext);
       case 'Videos':
-        return <String>{'mp4','mkv','mov','webm','3gp','avi','m4v'}.contains(ext);
+        return <String>{'mp4', 'mkv', 'mov', 'webm', '3gp', 'avi', 'm4v'}
+            .contains(ext);
       case 'Audio':
-        return <String>{'mp3','wav','m4a','aac','flac','ogg','opus','wma'}.contains(ext);
+        return <String>{
+          'mp3',
+          'wav',
+          'm4a',
+          'aac',
+          'flac',
+          'ogg',
+          'opus',
+          'wma'
+        }.contains(ext);
       case 'Documents':
-        return <String>{'pdf','doc','docx','txt','rtf','xls','xlsx','ppt','pptx','csv'}.contains(ext);
+        return <String>{
+          'pdf',
+          'doc',
+          'docx',
+          'txt',
+          'rtf',
+          'xls',
+          'xlsx',
+          'ppt',
+          'pptx',
+          'csv'
+        }.contains(ext);
       case 'APKs':
         return ext == 'apk';
       case 'Downloads':
@@ -824,22 +923,32 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
 
   List<FileSystemEntity> get _visibleItems {
     final source = _fileCategory == 'All files' ? _items : _categoryFiles;
-    final items = source.where((item) =>
-      (_showHidden || !_nameOf(item).startsWith('.')) &&
-      _nameOf(item).toLowerCase().contains(_search.toLowerCase()) &&
-      _matchesCategory(item)).toList();
+    final items = source
+        .where((item) =>
+            (_showHidden || !_nameOf(item).startsWith('.')) &&
+            _nameOf(item).toLowerCase().contains(_search.toLowerCase()) &&
+            _matchesCategory(item))
+        .toList();
     items.sort((a, b) {
       int result;
       switch (_sortMode) {
         case 'Size':
           int sizeOf(FileSystemEntity item) {
-            try { return item is File ? item.lengthSync() : 0; } catch (_) { return 0; }
+            try {
+              return item is File ? item.lengthSync() : 0;
+            } catch (_) {
+              return 0;
+            }
           }
           result = sizeOf(a).compareTo(sizeOf(b));
           break;
         case 'Date':
           DateTime dateOf(FileSystemEntity item) {
-            try { return item.statSync().modified; } catch (_) { return DateTime.fromMillisecondsSinceEpoch(0); }
+            try {
+              return item.statSync().modified;
+            } catch (_) {
+              return DateTime.fromMillisecondsSinceEpoch(0);
+            }
           }
           result = dateOf(a).compareTo(dateOf(b));
           break;
@@ -849,7 +958,9 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
         default:
           result = _nameOf(a).toLowerCase().compareTo(_nameOf(b).toLowerCase());
       }
-      if (_fileCategory == 'All files' && _foldersFirst && a is Directory != (b is Directory)) {
+      if (_fileCategory == 'All files' &&
+          _foldersFirst &&
+          a is Directory != (b is Directory)) {
         result = a is Directory ? -1 : 1;
       }
       return _sortDescending ? -result : result;
@@ -879,7 +990,9 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
           await for (final entity in directory.list(followLinks: false)) {
             if (entity is Directory) {
               final path = entity.path.replaceAll('\\\\', '/');
-              final name = entity.uri.pathSegments.isEmpty ? '' : entity.uri.pathSegments.last;
+              final name = entity.uri.pathSegments.isEmpty
+                  ? ''
+                  : entity.uri.pathSegments.last;
               if (!name.startsWith('.') &&
                   !path.contains('/Android/data/') &&
                   !path.contains('/Android/obb/') &&
@@ -902,7 +1015,8 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
         }
       }
       final byHash = <String, List<File>>{};
-      for (final candidates in bySize.values.where((items) => items.length > 1)) {
+      for (final candidates
+          in bySize.values.where((items) => items.length > 1)) {
         for (final file in candidates) {
           try {
             final digest = await sha256.bind(file.openRead()).first;
@@ -920,25 +1034,35 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
           content: SizedBox(
             width: double.maxFinite,
             child: groups.isEmpty
-              ? Text('No byte-identical duplicate files found in the scanned area. Scanned up to $visited files.')
-              : ListView(
-                  shrinkWrap: true,
-                  children: groups.map((group) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('${group.length} identical copies',
-                          style: const TextStyle(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 5),
-                        ...group.map((file) => Text(file.path,
-                          style: const TextStyle(fontSize: 11, color: Colors.white70))),
-                      ],
-                    ),
-                  )).toList(),
-                ),
+                ? Text(
+                    'No byte-identical duplicate files found in the scanned area. Scanned up to $visited files.')
+                : ListView(
+                    shrinkWrap: true,
+                    children: groups
+                        .map((group) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('${group.length} identical copies',
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 5),
+                                  ...group.map((file) => Text(file.path,
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.white70))),
+                                ],
+                              ),
+                            ))
+                        .toList(),
+                  ),
           ),
-          actions: [TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close'))],
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Close'))
+          ],
         ),
       );
     } catch (e) {
@@ -973,7 +1097,8 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
 
   void _onSecretGestureMove(PointerMoveEvent event) {
     if (event.pointer != _secretGesturePointer) return;
-    final last = _secretGesturePoints.isEmpty ? null : _secretGesturePoints.last;
+    final last =
+        _secretGesturePoints.isEmpty ? null : _secretGesturePoints.last;
     if (last == null || (event.localPosition - last).distance >= 3) {
       _secretGesturePoints.add(event.localPosition);
       if (mounted) setState(() {});
@@ -1025,11 +1150,15 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
 
     final cornerRadius = side * .38;
     final corners = <Offset>[
-      Offset(minX, minY), Offset(maxX, minY),
-      Offset(maxX, maxY), Offset(minX, maxY),
+      Offset(minX, minY),
+      Offset(maxX, minY),
+      Offset(maxX, maxY),
+      Offset(minX, maxY),
     ];
     for (final corner in corners) {
-      if (!points.any((p) => (p - corner).distance <= cornerRadius)) return false;
+      if (!points.any((p) => (p - corner).distance <= cornerRadius)) {
+        return false;
+      }
     }
     return true;
   }
@@ -1041,12 +1170,17 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       builder: (context) => AlertDialog(
         backgroundColor: const Color(0xFF102B38),
         title: const Text('New folder'),
-        content: TextField(controller: controller, autofocus: true,
-          decoration: const InputDecoration(hintText: 'Folder name')),
+        content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(hintText: 'Folder name')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Create')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('Create')),
         ],
       ),
     );
@@ -1055,7 +1189,7 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       await Directory(_current.path + Platform.pathSeparator + name).create();
       await _loadDirectory(_current);
     } catch (e) {
-      _message('Could not create folder: ' + e.toString());
+      _message('Could not create folder: $e');
     }
   }
 
@@ -1068,9 +1202,12 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
         title: const Text('Rename'),
         content: TextField(controller: controller, autofocus: true),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Save')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('Save')),
         ],
       ),
     );
@@ -1084,26 +1221,31 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       }
       await _loadDirectory(_current);
     } catch (e) {
-      _message('Rename failed: ' + e.toString());
+      _message('Rename failed: $e');
     }
   }
 
   Future<void> _shareEntity(FileSystemEntity entity) async {
     if (entity is! File) {
-      _message('Sharing folders is not supported yet. Select an individual file.');
+      _message(
+          'Sharing folders is not supported yet. Select an individual file.');
       return;
     }
     try {
       await Share.shareXFiles([XFile(entity.path)], text: _nameOf(entity));
     } catch (e) {
-      _message('Could not share this file: ' + e.toString());
+      _message('Could not share this file: $e');
     }
   }
 
   Future<void> _showDetails(FileSystemEntity entity) async {
     var size = 'Folder';
     if (entity is File) {
-      try { size = _formatBytes(await entity.length()); } catch (_) { size = 'Unavailable'; }
+      try {
+        size = _formatBytes(await entity.length());
+      } catch (_) {
+        size = 'Unavailable';
+      }
     }
     if (!mounted) return;
     showModalBottomSheet<void>(
@@ -1111,23 +1253,30 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       backgroundColor: const Color(0xFF102B38),
       builder: (context) => Padding(
         padding: const EdgeInsets.all(22),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(_nameOf(entity), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          Text(entity.path, style: const TextStyle(color: Colors.white60)),
-          const SizedBox(height: 8),
-          Text('Size: ' + size),
-          const SizedBox(height: 18),
-        ]),
+        child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(_nameOf(entity),
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              Text(entity.path, style: const TextStyle(color: Colors.white60)),
+              const SizedBox(height: 8),
+              Text('Size: $size'),
+              const SizedBox(height: 18),
+            ]),
       ),
     );
   }
 
   String _formatBytes(int bytes) {
     if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toStringAsFixed(1) + ' KB';
-    if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toStringAsFixed(1) + ' MB';
-    return (bytes / (1024 * 1024 * 1024)).toStringAsFixed(2) + ' GB';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 
   void _message(String value) {
@@ -1135,48 +1284,72 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   }
 
   Future<bool> _unlockFolderIfNeeded(Directory directory) async {
-    final key = 'aqua_folder_pin_${sha256.convert(utf8.encode(directory.path))}';
+    final key =
+        'aqua_folder_pin_${sha256.convert(utf8.encode(directory.path))}';
     final stored = await _folderPinStore.read(key: key);
+    if (!mounted) return false;
     if (stored == null) return true;
     final controller = TextEditingController();
     final pin = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Unlock ${_nameOf(directory)}'),
-        content: TextField(controller: controller, obscureText: true,
-          keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Folder PIN')),
+        content: TextField(
+            controller: controller,
+            obscureText: true,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(labelText: 'Folder PIN')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Unlock')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text),
+              child: const Text('Unlock')),
         ],
       ),
     );
     if (pin == null) return false;
-    final digest = sha256.convert(utf8.encode('${directory.path}:$pin')).toString();
-    if (digest != stored) { _message('Incorrect folder PIN.'); return false; }
+    final digest =
+        sha256.convert(utf8.encode('${directory.path}:$pin')).toString();
+    if (digest != stored) {
+      _message('Incorrect folder PIN.');
+      return false;
+    }
     return true;
   }
 
   Future<void> _setFolderPin(Directory directory) async {
-    final key = 'aqua_folder_pin_${sha256.convert(utf8.encode(directory.path))}';
+    final key =
+        'aqua_folder_pin_${sha256.convert(utf8.encode(directory.path))}';
     final stored = await _folderPinStore.read(key: key);
+    if (!mounted) return;
     if (stored != null) {
       final controller = TextEditingController();
       final pin = await showDialog<String>(
         context: context,
         builder: (context) => AlertDialog(
           title: Text('Remove PIN • ${_nameOf(directory)}'),
-          content: TextField(controller: controller, obscureText: true, keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Current PIN')),
+          content: TextField(
+              controller: controller,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Current PIN')),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(context, controller.text), child: const Text('Remove lock')),
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, controller.text),
+                child: const Text('Remove lock')),
           ],
         ),
       );
       if (pin == null) return;
-      if (sha256.convert(utf8.encode('${directory.path}:$pin')).toString() != stored) {
-        _message('Incorrect folder PIN.'); return;
+      if (sha256.convert(utf8.encode('${directory.path}:$pin')).toString() !=
+          stored) {
+        _message('Incorrect folder PIN.');
+        return;
       }
       await _folderPinStore.delete(key: key);
       _message('Folder PIN removed.');
@@ -1189,24 +1362,39 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       builder: (context) => AlertDialog(
         title: Text('Protect ${_nameOf(directory)}'),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: first, obscureText: true, keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Create PIN (6+ digits)')),
-          TextField(controller: second, obscureText: true, keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Confirm PIN')),
+          TextField(
+              controller: first,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              decoration:
+                  const InputDecoration(labelText: 'Create PIN (6+ digits)')),
+          TextField(
+              controller: second,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Confirm PIN')),
         ]),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, first.text), child: const Text('Protect')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, first.text),
+              child: const Text('Protect')),
         ],
       ),
     );
     if (pin == null) return;
     if (pin.length < 6 || pin != second.text) {
-      _message('PINs must match and contain at least 6 characters.'); return;
+      _message('PINs must match and contain at least 6 characters.');
+      return;
     }
-    await _folderPinStore.write(key: key,
-      value: sha256.convert(utf8.encode('${directory.path}:$pin')).toString());
-    _message('In-app PIN gate enabled. This does not encrypt the folder or block access from other apps.');
+    await _folderPinStore.write(
+        key: key,
+        value:
+            sha256.convert(utf8.encode('${directory.path}:$pin')).toString());
+    _message(
+        'In-app PIN gate enabled. This does not encrypt the folder or block access from other apps.');
   }
 
   Future<void> _openEntity(FileSystemEntity entity) async {
@@ -1219,13 +1407,33 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       return;
     }
     final ext = _extensionOf(entity);
-    const images = <String>{'jpg','jpeg','png','gif','webp','bmp','heic','heif','tif','tiff'};
+    const images = <String>{
+      'jpg',
+      'jpeg',
+      'png',
+      'gif',
+      'webp',
+      'bmp',
+      'heic',
+      'heif',
+      'tif',
+      'tiff'
+    };
     if (images.contains(ext)) {
       await _viewImageFile(entity);
       return;
     }
-    const audio = <String>{'mp3','wav','m4a','aac','flac','ogg','opus','wma'};
-    const video = <String>{'mp4','mkv','mov','webm','3gp','avi','m4v'};
+    const audio = <String>{
+      'mp3',
+      'wav',
+      'm4a',
+      'aac',
+      'flac',
+      'ogg',
+      'opus',
+      'wma'
+    };
+    const video = <String>{'mp4', 'mkv', 'mov', 'webm', '3gp', 'avi', 'm4v'};
     if (audio.contains(ext)) {
       await _playAudioFile(entity);
       return;
@@ -1260,7 +1468,9 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
             backgroundColor: const Color(0xFF050B12),
             foregroundColor: Colors.white,
             title: Text(
-              file.uri.pathSegments.isEmpty ? 'Image' : file.uri.pathSegments.last,
+              file.uri.pathSegments.isEmpty
+                  ? 'Image'
+                  : file.uri.pathSegments.last,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -1284,7 +1494,8 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.broken_image_outlined, color: Colors.white70, size: 56),
+                      Icon(Icons.broken_image_outlined,
+                          color: Colors.white70, size: 56),
                       SizedBox(height: 12),
                       Text(
                         'This image could not be displayed.',
@@ -1322,9 +1533,11 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
                 return Column(mainAxisSize: MainAxisSize.min, children: [
                   Icon(Icons.graphic_eq_rounded, color: _accent, size: 44),
                   const SizedBox(height: 10),
-                  Text(_nameOf(file), maxLines: 2, textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w700)),
+                  Text(_nameOf(file),
+                      maxLines: 2,
+                      textAlign: TextAlign.center,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 14),
                   Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                     IconButton(
@@ -1336,8 +1549,9 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
                           await _mediaAudioPlayer.resume();
                         }
                       },
-                      icon: Icon(playing ? Icons.pause_circle : Icons.play_circle,
-                        color: _accent),
+                      icon: Icon(
+                          playing ? Icons.pause_circle : Icons.play_circle,
+                          color: _accent),
                     ),
                     IconButton(
                       iconSize: 30,
@@ -1368,27 +1582,32 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
         return;
       }
       await controller.play();
+      if (!mounted) return;
       await showDialog<void>(
         context: context,
         builder: (dialogContext) => AlertDialog(
           backgroundColor: const Color(0xFF102B38),
-          title: Text(_nameOf(file), maxLines: 1, overflow: TextOverflow.ellipsis),
+          title:
+              Text(_nameOf(file), maxLines: 1, overflow: TextOverflow.ellipsis),
           content: AspectRatio(
             aspectRatio: controller.value.aspectRatio > 0
-                ? controller.value.aspectRatio : 16 / 9,
+                ? controller.value.aspectRatio
+                : 16 / 9,
             child: VideoPlayer(controller),
           ),
           actions: [
             ValueListenableBuilder<VideoPlayerValue>(
               valueListenable: controller,
               builder: (context, value, _) => TextButton.icon(
-                onPressed: () => value.isPlaying ? controller.pause() : controller.play(),
+                onPressed: () =>
+                    value.isPlaying ? controller.pause() : controller.play(),
                 icon: Icon(value.isPlaying ? Icons.pause : Icons.play_arrow),
                 label: Text(value.isPlaying ? 'Pause' : 'Play'),
               ),
             ),
-            TextButton(onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Close')),
+            TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: const Text('Close')),
           ],
         ),
       );
@@ -1398,7 +1617,6 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       await controller.dispose();
     }
   }
-
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -1435,12 +1653,14 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       } else if (_hasStorage) {
         setState(() {
           _hasStorage = false;
-          _storageMessage = 'Storage permission is not enabled. Grant All files access or choose individual files with Android’s system picker.';
+          _storageMessage =
+              'Storage permission is not enabled. Grant All files access or choose individual files with Android’s system picker.';
         });
       }
     } catch (error) {
       if (mounted) {
-        setState(() => _storageMessage = 'Could not re-check storage access: $error');
+        setState(() =>
+            _storageMessage = 'Could not re-check storage access: $error');
       }
     }
   }
@@ -1466,304 +1686,410 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
         useMaterial3: true,
         brightness: _light ? Brightness.light : Brightness.dark,
         scaffoldBackgroundColor: base,
-        colorScheme: ColorScheme.fromSeed(seedColor: _accent,
-          brightness: _light ? Brightness.light : Brightness.dark),
+        colorScheme: ColorScheme.fromSeed(
+            seedColor: _accent,
+            brightness: _light ? Brightness.light : Brightness.dark),
       ),
       home: _showSplash
           ? const BubbleSplashScreen()
           : Scaffold(
-        body: Listener(
-          onPointerDown: (event) {
-            _bubbleFieldKey.currentState?.handlePointerDown(event.localPosition);
-            _onSecretGestureDown(event);
-          },
-          onPointerMove: (event) {
-            _bubbleFieldKey.currentState?.handlePointerMove(event.localPosition);
-            _onSecretGestureMove(event);
-          },
-          onPointerUp: (event) {
-            _bubbleFieldKey.currentState?.handlePointerUp();
-            _onSecretGestureUp(event);
-          },
-          onPointerCancel: (event) {
-            _bubbleFieldKey.currentState?.handlePointerUp();
-            _onSecretGestureCancel(event);
-          },
-          child: Stack(children: [
-          Positioned.fill(child: AquaBackdrop(reduced: _performance)),
-          if (_animations)
-            Positioned.fill(child: BubbleField(
-              key: _bubbleFieldKey,
-              accent: _accent,
-              gravityEnabled: _gravity,
-              reduced: _performance,
-              speed: _bubbleSpeed,
-            )),
-          SafeArea(child: Column(children: [
-            _header(foreground),
-            Expanded(child: PageView(
-              controller: _tabController,
-              physics: const NeverScrollableScrollPhysics(),
-              onPageChanged: (index) {
-                if (_tab != index) setState(() => _tab = index);
-              },
-              children: [
-                _home(foreground),
-                _files(foreground),
-                _settings(foreground),
-                _recycleBin(foreground),
-              ],
-            )),
-            _bottomNav(foreground),
-          ])),
-          if (_secretGesturePoints.length > 1)
-            Positioned.fill(child: IgnorePointer(child: CustomPaint(
-              painter: _SecretBoxGesturePainter(_secretGesturePoints),
-            ))),
-        ])),
-      ),
+              body: Listener(
+                  onPointerDown: (event) {
+                    _bubbleFieldKey.currentState
+                        ?.handlePointerDown(event.localPosition);
+                    _onSecretGestureDown(event);
+                  },
+                  onPointerMove: (event) {
+                    _bubbleFieldKey.currentState
+                        ?.handlePointerMove(event.localPosition);
+                    _onSecretGestureMove(event);
+                  },
+                  onPointerUp: (event) {
+                    _bubbleFieldKey.currentState?.handlePointerUp();
+                    _onSecretGestureUp(event);
+                  },
+                  onPointerCancel: (event) {
+                    _bubbleFieldKey.currentState?.handlePointerUp();
+                    _onSecretGestureCancel(event);
+                  },
+                  child: Stack(children: [
+                    Positioned.fill(child: AquaBackdrop(reduced: _performance)),
+                    if (_animations)
+                      Positioned.fill(
+                          child: BubbleField(
+                        key: _bubbleFieldKey,
+                        accent: _accent,
+                        gravityEnabled: _gravity,
+                        reduced: _performance,
+                        speed: _bubbleSpeed,
+                      )),
+                    SafeArea(
+                        child: Column(children: [
+                      _header(foreground),
+                      Expanded(
+                          child: PageView(
+                        controller: _tabController,
+                        physics: const NeverScrollableScrollPhysics(),
+                        onPageChanged: (index) {
+                          if (_tab != index) setState(() => _tab = index);
+                        },
+                        children: [
+                          _home(foreground),
+                          _files(foreground),
+                          _settings(foreground),
+                          _recycleBin(foreground),
+                        ],
+                      )),
+                      _bottomNav(foreground),
+                    ])),
+                    if (_secretGesturePoints.length > 1)
+                      Positioned.fill(
+                          child: IgnorePointer(
+                              child: CustomPaint(
+                        painter: _SecretBoxGesturePainter(_secretGesturePoints),
+                      ))),
+                  ])),
+            ),
     );
   }
 
   Widget _header(Color foreground) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 10, 18, 10),
-    child: Row(children: [
-      Container(width: 43, height: 43,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(15),
-          gradient: LinearGradient(colors: [_accent.withOpacity(.9), _accent.withOpacity(.35)]),
-          boxShadow: [BoxShadow(color: _accent.withOpacity(.22), blurRadius: 18)],
-        ),
-        child: const Icon(Icons.water_drop_rounded, color: Color(0xFF06202A))),
-      const SizedBox(width: 12),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('BUBBLE', style: TextStyle(color: foreground, fontSize: 18,
-          fontWeight: FontWeight.w900, letterSpacing: 3)),
-        Text('FILE MANAGER', style: TextStyle(color: foreground.withOpacity(.55),
-          fontSize: 9, letterSpacing: 2.4)),
-      ])),
-      IconButton(onPressed: () => _selectTab(2),
-        icon: Icon(Icons.tune_rounded, color: foreground.withOpacity(.8))),
-    ]),
-  );
+        padding: const EdgeInsets.fromLTRB(20, 10, 18, 10),
+        child: Row(children: [
+          Container(
+              width: 43,
+              height: 43,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(15),
+                gradient: LinearGradient(colors: [
+                  _accent.withValues(alpha: .9),
+                  _accent.withValues(alpha: .35)
+                ]),
+                boxShadow: [
+                  BoxShadow(
+                      color: _accent.withValues(alpha: .22), blurRadius: 18)
+                ],
+              ),
+              child: const Icon(Icons.water_drop_rounded,
+                  color: Color(0xFF06202A))),
+          const SizedBox(width: 12),
+          Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Text('BUBBLE',
+                    style: TextStyle(
+                        color: foreground,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 3)),
+                Text('FILE MANAGER',
+                    style: TextStyle(
+                        color: foreground.withValues(alpha: .55),
+                        fontSize: 9,
+                        letterSpacing: 2.4)),
+              ])),
+          IconButton(
+              onPressed: () => _selectTab(2),
+              icon: Icon(Icons.tune_rounded,
+                  color: foreground.withValues(alpha: .8))),
+        ]),
+      );
 
   Widget _home(Color foreground) => ListView(
-    key: const PageStorageKey<String>('home-page'),
-    padding: const EdgeInsets.fromLTRB(19, 8, 19, 22),
-    children: [
-      const SizedBox(height: 10),
-      Text('Your space,', style: TextStyle(fontSize: 29, fontWeight: FontWeight.w300, color: foreground)),
-      Text('beautifully organized.', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: foreground)),
-      const SizedBox(height: 20),
-      _glass(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Expanded(child: Text('STORAGE DROPS', style: TextStyle(fontSize: 10, letterSpacing: 1.7, color: Colors.white60))),
-          IconButton(
-            tooltip: 'Refresh connected storage',
-            visualDensity: VisualDensity.compact,
-            onPressed: _hasStorage ? _refreshStorageVolumes : _requestStorage,
-            icon: Icon(Icons.refresh_rounded, color: _accent, size: 19),
-          ),
-        ]),
-        if (!_hasStorage)
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('Allow storage access to browse shared folders, or choose individual files with Android’s system picker.',
-                style: TextStyle(fontSize: 12, color: Colors.white60, height: 1.4)),
-              const SizedBox(height: 8),
-              Wrap(spacing: 8, runSpacing: 6, children: [
-                FilledButton.tonalIcon(
-                  onPressed: _checkingPermission ? null : _requestStorage,
-                  icon: const Icon(Icons.folder_open_rounded, size: 17),
-                  label: Text(_checkingPermission
-                      ? 'Checking…'
-                      : _usesAllFilesAccess ? 'Allow All files access' : 'Allow storage access'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: _pickFilesWithoutAllAccess,
-                  icon: const Icon(Icons.file_open_rounded, size: 17),
-                  label: const Text('Pick files'),
-                ),
-              ]),
-            ]),
-          )
-        else if (_storageVolumes.isNotEmpty)
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _storageVolumes.map((volume) => Padding(
-                padding: const EdgeInsets.only(right: 9),
-                child: _storageVolumeDrop(volume),
-              )).toList(),
-            ),
-          )
-        else
-          Row(children: [
-            CustomPaint(
-              size: const Size(48, 58),
-              painter: _StorageDropPainter(
-                fraction: _storageUsedFraction,
-                color: _storageStatusColor,
-                active: _storageTotalBytes > 0,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(child: Text(
-              _storageTotalBytes > 0
-                ? '${_formatBytes(_storageTotalBytes - _storageFreeBytes)} used • ${_formatBytes(_storageTotalBytes)} total'
-                : 'Internal storage is connected',
-              style: const TextStyle(fontSize: 11, color: Colors.white70),
-            )),
-          ]),
-      ])),
-      if (_hasStorage) ...[
-        const SizedBox(height: 17),
-        const Text('QUICK FOLDERS', style: TextStyle(fontSize: 10, letterSpacing: 2, color: Colors.white60)),
-        const SizedBox(height: 8),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(children: [
-            _quickFolderChip('Downloads', Icons.download_rounded, const ['Download', 'Downloads']),
-            _quickFolderChip('Documents', Icons.description_rounded, const ['Documents']),
-            _quickFolderChip('Pictures', Icons.image_rounded, const ['Pictures']),
-            _quickFolderChip('Music', Icons.headphones_rounded, const ['Music']),
-            _quickFolderChip('Videos', Icons.movie_rounded, const ['Movies', 'Videos']),
-          ]),
-        ),
-      ],
-      const SizedBox(height: 20),
-      const Text('EXPLORE', style: TextStyle(fontSize: 10, letterSpacing: 2, color: Colors.white60)),
-      const SizedBox(height: 11),
-      GridView.count(
-        shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
-        crossAxisCount: 2, crossAxisSpacing: 11, mainAxisSpacing: 11,
-        childAspectRatio: 1.65,
+        key: const PageStorageKey<String>('home-page'),
+        padding: const EdgeInsets.fromLTRB(19, 8, 19, 22),
         children: [
-          _category('All files', Icons.folder_copy_rounded),
-          _category('Images', Icons.image_rounded),
-          _category('Videos', Icons.movie_rounded),
-          _category('Audio', Icons.headphones_rounded),
-          _category('Documents', Icons.description_rounded),
-          _category('Downloads', Icons.download_rounded),
-          _category('Places', Icons.location_on_rounded),
-        ],
-      ),
-      const SizedBox(height: 14),
-      InkWell(onTap: _openAdvancedTools, borderRadius: BorderRadius.circular(22),
-        child: _glass(child: Row(children: [
-          Icon(Icons.auto_awesome_rounded, color: _accent, size: 27),
-          const SizedBox(width: 12),
-          const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Advanced tools', style: TextStyle(fontWeight: FontWeight.w800)),
-            Text('Vault • ZIP • GPS maps • Smart Cleanup • SD / USB', style: TextStyle(fontSize: 10, color: Colors.white60)),
+          const SizedBox(height: 10),
+          Text('Your space,',
+              style: TextStyle(
+                  fontSize: 29,
+                  fontWeight: FontWeight.w300,
+                  color: foreground)),
+          Text('beautifully organized.',
+              style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: foreground)),
+          const SizedBox(height: 20),
+          _glass(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Row(children: [
+                  const Expanded(
+                      child: Text('STORAGE DROPS',
+                          style: TextStyle(
+                              fontSize: 10,
+                              letterSpacing: 1.7,
+                              color: Colors.white60))),
+                  IconButton(
+                    tooltip: 'Refresh connected storage',
+                    visualDensity: VisualDensity.compact,
+                    onPressed:
+                        _hasStorage ? _refreshStorageVolumes : _requestStorage,
+                    icon: Icon(Icons.refresh_rounded, color: _accent, size: 19),
+                  ),
+                ]),
+                if (!_hasStorage)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                              'Allow storage access to browse shared folders, or choose individual files with Android’s system picker.',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.white60,
+                                  height: 1.4)),
+                          const SizedBox(height: 8),
+                          Wrap(spacing: 8, runSpacing: 6, children: [
+                            FilledButton.tonalIcon(
+                              onPressed:
+                                  _checkingPermission ? null : _requestStorage,
+                              icon: const Icon(Icons.folder_open_rounded,
+                                  size: 17),
+                              label: Text(_checkingPermission
+                                  ? 'Checking…'
+                                  : _usesAllFilesAccess
+                                      ? 'Allow All files access'
+                                      : 'Allow storage access'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _pickFilesWithoutAllAccess,
+                              icon:
+                                  const Icon(Icons.file_open_rounded, size: 17),
+                              label: const Text('Pick files'),
+                            ),
+                          ]),
+                        ]),
+                  )
+                else if (_storageVolumes.isNotEmpty)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: _storageVolumes
+                          .map((volume) => Padding(
+                                padding: const EdgeInsets.only(right: 9),
+                                child: _storageVolumeDrop(volume),
+                              ))
+                          .toList(),
+                    ),
+                  )
+                else
+                  Row(children: [
+                    CustomPaint(
+                      size: const Size(48, 58),
+                      painter: _StorageDropPainter(
+                        fraction: _storageUsedFraction,
+                        color: _storageStatusColor,
+                        active: _storageTotalBytes > 0,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                        child: Text(
+                      _storageTotalBytes > 0
+                          ? '${_formatBytes(_storageTotalBytes - _storageFreeBytes)} used • ${_formatBytes(_storageTotalBytes)} total'
+                          : 'Internal storage is connected',
+                      style:
+                          const TextStyle(fontSize: 11, color: Colors.white70),
+                    )),
+                  ]),
+              ])),
+          if (_hasStorage) ...[
+            const SizedBox(height: 17),
+            const Text('QUICK FOLDERS',
+                style: TextStyle(
+                    fontSize: 10, letterSpacing: 2, color: Colors.white60)),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(children: [
+                _quickFolderChip('Downloads', Icons.download_rounded,
+                    const ['Download', 'Downloads']),
+                _quickFolderChip('Documents', Icons.description_rounded,
+                    const ['Documents']),
+                _quickFolderChip(
+                    'Pictures', Icons.image_rounded, const ['Pictures']),
+                _quickFolderChip(
+                    'Music', Icons.headphones_rounded, const ['Music']),
+                _quickFolderChip(
+                    'Videos', Icons.movie_rounded, const ['Movies', 'Videos']),
+              ]),
+            ),
+          ],
+          const SizedBox(height: 20),
+          const Text('EXPLORE',
+              style: TextStyle(
+                  fontSize: 10, letterSpacing: 2, color: Colors.white60)),
+          const SizedBox(height: 11),
+          GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: 2,
+            crossAxisSpacing: 11,
+            mainAxisSpacing: 11,
+            childAspectRatio: 1.65,
+            children: [
+              _category('All files', Icons.folder_copy_rounded),
+              _category('Images', Icons.image_rounded),
+              _category('Videos', Icons.movie_rounded),
+              _category('Audio', Icons.headphones_rounded),
+              _category('Documents', Icons.description_rounded),
+              _category('Downloads', Icons.download_rounded),
+              _category('Places', Icons.location_on_rounded),
+            ],
+          ),
+          const SizedBox(height: 14),
+          InkWell(
+              onTap: _openAdvancedTools,
+              borderRadius: BorderRadius.circular(22),
+              child: _glass(
+                  child: Row(children: [
+                Icon(Icons.auto_awesome_rounded, color: _accent, size: 27),
+                const SizedBox(width: 12),
+                const Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text('Advanced tools',
+                          style: TextStyle(fontWeight: FontWeight.w800)),
+                      Text('Vault • ZIP • GPS maps • Smart Cleanup • SD / USB',
+                          style:
+                              TextStyle(fontSize: 10, color: Colors.white60)),
+                    ])),
+                const Icon(Icons.chevron_right_rounded, color: Colors.white54),
+              ]))),
+          const SizedBox(height: 17),
+          _glass(
+              child: Row(children: [
+            Icon(Icons.bubble_chart_rounded, color: _accent, size: 28),
+            const SizedBox(width: 12),
+            const Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text('Living water bubbles',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  Text('Touch the open background to pop a bubble',
+                      style: TextStyle(fontSize: 11, color: Colors.white60)),
+                ])),
           ])),
-          const Icon(Icons.chevron_right_rounded, color: Colors.white54),
-        ]))),
-      const SizedBox(height: 17),
-      _glass(child: Row(children: [
-        Icon(Icons.bubble_chart_rounded, color: _accent, size: 28),
-        const SizedBox(width: 12),
-        const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Living water bubbles', style: TextStyle(fontWeight: FontWeight.w700)),
-          Text('Touch the open background to pop a bubble',
-            style: TextStyle(fontSize: 11, color: Colors.white60)),
-        ])),
-      ])),
-    ],
-  );
+        ],
+      );
 
   Widget _quickFolderChip(String label, IconData icon, List<String> paths) =>
-    Padding(
-      padding: const EdgeInsets.only(right: 7),
-      child: ActionChip(
-        avatar: Icon(icon, size: 16, color: _accent),
-        label: Text(label, style: const TextStyle(fontSize: 11)),
-        onPressed: () => _openQuickFolder(label, paths),
-        backgroundColor: Colors.white.withOpacity(.08),
-        side: BorderSide(color: Colors.white.withOpacity(.12)),
-      ),
-    );
+      Padding(
+        padding: const EdgeInsets.only(right: 7),
+        child: ActionChip(
+          avatar: Icon(icon, size: 16, color: _accent),
+          label: Text(label, style: const TextStyle(fontSize: 11)),
+          onPressed: () => _openQuickFolder(label, paths),
+          backgroundColor: Colors.white.withValues(alpha: .08),
+          side: BorderSide(color: Colors.white.withValues(alpha: .12)),
+        ),
+      );
 
   Widget _category(String title, IconData icon) => InkWell(
-    borderRadius: BorderRadius.circular(20),
-    onTap: () {
-      if (title == 'Places') {
-        Navigator.of(context).push(MaterialPageRoute<void>(
-          builder: (_) => LocationAlbumsPage(
-            targetDirectory: _root,
-            accent: _accent,
-          ),
-        ));
-      } else if (title == 'All files') {
-        setState(() { _fileCategory = title; _search = ''; });
-        _selectTab(1);
-        _loadDirectory(_root);
-      } else {
-        _loadCategoryFiles(title);
-      }
-    },
-    child: _glass(child: Row(children: [
-      Icon(icon, color: _accent, size: 25),
-      const SizedBox(width: 10),
-      Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w600))),
-      const Icon(Icons.chevron_right_rounded, color: Colors.white38, size: 18),
-    ])),
-  );
+        borderRadius: BorderRadius.circular(20),
+        onTap: () {
+          if (title == 'Places') {
+            Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => LocationAlbumsPage(
+                targetDirectory: _root,
+                accent: _accent,
+              ),
+            ));
+          } else if (title == 'All files') {
+            setState(() {
+              _fileCategory = title;
+              _search = '';
+            });
+            _selectTab(1);
+            _loadDirectory(_root);
+          } else {
+            _loadCategoryFiles(title);
+          }
+        },
+        child: _glass(
+            child: Row(children: [
+          Icon(icon, color: _accent, size: 25),
+          const SizedBox(width: 10),
+          Expanded(
+              child: Text(title,
+                  style: const TextStyle(fontWeight: FontWeight.w600))),
+          const Icon(Icons.chevron_right_rounded,
+              color: Colors.white38, size: 18),
+        ])),
+      );
 
   Widget _storageAccessFallback() => Center(
-    child: SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 430),
-        child: _glass(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.folder_off_rounded, color: _accent, size: 42),
-          const SizedBox(height: 12),
-          const Text('Storage access needed', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text(_storageMessage, textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.white60, height: 1.4)),
-          const SizedBox(height: 16),
-          Wrap(alignment: WrapAlignment.center, spacing: 8, runSpacing: 8, children: [
-            FilledButton.icon(
-              onPressed: _checkingPermission ? null : _requestStorage,
-              icon: const Icon(Icons.security_rounded),
-              label: Text(_checkingPermission
-                  ? 'Checking…'
-                  : _usesAllFilesAccess ? 'Allow All files access' : 'Allow storage access'),
-            ),
-            OutlinedButton.icon(
-              onPressed: _pickFilesWithoutAllAccess,
-              icon: const Icon(Icons.file_open_rounded),
-              label: const Text('Pick individual files'),
-            ),
-          ]),
-          if (_pickerFiles.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text('FILES SELECTED WITH ANDROID', style: TextStyle(fontSize: 10, letterSpacing: 1.4)),
-            ),
-            const SizedBox(height: 6),
-            for (final picked in _pickerFiles.take(8))
-              ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.insert_drive_file_outlined),
-                title: Text(picked.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                subtitle: Text(_formatBytes(picked.size), style: const TextStyle(fontSize: 10)),
-                onTap: () => _openPickedFile(picked),
-                trailing: IconButton(
-                  tooltip: 'Share ${picked.name}',
-                  icon: const Icon(Icons.share_rounded, size: 18),
-                  onPressed: () => _sharePickedFile(picked),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 430),
+            child: _glass(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.folder_off_rounded, color: _accent, size: 42),
+              const SizedBox(height: 12),
+              const Text('Storage access needed',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text(_storageMessage,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white60, height: 1.4)),
+              const SizedBox(height: 16),
+              Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: _checkingPermission ? null : _requestStorage,
+                      icon: const Icon(Icons.security_rounded),
+                      label: Text(_checkingPermission
+                          ? 'Checking…'
+                          : _usesAllFilesAccess
+                              ? 'Allow All files access'
+                              : 'Allow storage access'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _pickFilesWithoutAllAccess,
+                      icon: const Icon(Icons.file_open_rounded),
+                      label: const Text('Pick individual files'),
+                    ),
+                  ]),
+              if (_pickerFiles.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('FILES SELECTED WITH ANDROID',
+                      style: TextStyle(fontSize: 10, letterSpacing: 1.4)),
                 ),
-              ),
-          ],
-        ])),
-      ),
-    ),
-  );
+                const SizedBox(height: 6),
+                for (final picked in _pickerFiles.take(8))
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.insert_drive_file_outlined),
+                    title: Text(picked.name,
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: Text(_formatBytes(picked.size),
+                        style: const TextStyle(fontSize: 10)),
+                    onTap: () => _openPickedFile(picked),
+                    trailing: IconButton(
+                      tooltip: 'Share ${picked.name}',
+                      icon: const Icon(Icons.share_rounded, size: 18),
+                      onPressed: () => _sharePickedFile(picked),
+                    ),
+                  ),
+              ],
+            ])),
+          ),
+        ),
+      );
 
   Widget _files(Color foreground) {
     final visibleItems = _visibleItems;
@@ -1771,101 +2097,154 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       Padding(
         padding: const EdgeInsets.fromLTRB(19, 8, 19, 10),
         child: Row(children: [
-          Expanded(child: Text(_fileCategory, style: TextStyle(fontSize: 27,
-            fontWeight: FontWeight.w800, color: foreground))),
-          IconButton(onPressed: _scanningDuplicates ? null : _findDuplicates, tooltip: 'Find identical files', icon: Icon(Icons.copy_all_rounded, color: _accent)),
+          Expanded(
+              child: Text(_fileCategory,
+                  style: TextStyle(
+                      fontSize: 27,
+                      fontWeight: FontWeight.w800,
+                      color: foreground))),
+          IconButton(
+              onPressed: _scanningDuplicates ? null : _findDuplicates,
+              tooltip: 'Find identical files',
+              icon: Icon(Icons.copy_all_rounded, color: _accent)),
           if (_clipboardEntity != null)
-            IconButton(onPressed: _pasteClipboard, tooltip: 'Paste', icon: Icon(Icons.content_paste_rounded, color: _accent)),
-          IconButton(onPressed: _createFolder, tooltip: 'New folder', icon: Icon(Icons.create_new_folder_rounded, color: _accent)),
-          IconButton(onPressed: () => _loadDirectory(_root), tooltip: 'Home folder', icon: Icon(Icons.home_rounded, color: _accent)),
+            IconButton(
+                onPressed: _pasteClipboard,
+                tooltip: 'Paste',
+                icon: Icon(Icons.content_paste_rounded, color: _accent)),
+          IconButton(
+              onPressed: _createFolder,
+              tooltip: 'New folder',
+              icon: Icon(Icons.create_new_folder_rounded, color: _accent)),
+          IconButton(
+              onPressed: () => _loadDirectory(_root),
+              tooltip: 'Home folder',
+              icon: Icon(Icons.home_rounded, color: _accent)),
         ]),
       ),
       if (!_hasStorage)
         Expanded(child: _storageAccessFallback())
       else ...[
-        Padding(padding: const EdgeInsets.symmetric(horizontal: 19), child: _glass(
-          child: Column(children: [
-            TextField(
-              decoration: const InputDecoration(
-                hintText: 'Search this folder', prefixIcon: Icon(Icons.search_rounded),
-                border: InputBorder.none, isDense: true),
-              onChanged: (value) => setState(() => _search = value),
-            ),
-            Row(children: [
-              IconButton(onPressed: () {
-                if (_current.path != _root.path) _loadDirectory(_current.parent);
-              }, icon: const Icon(Icons.arrow_back_rounded, size: 19)),
-              Expanded(child: Text(_current.path, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 10, color: Colors.white60))),
-              PopupMenuButton<String>(
-                tooltip: 'Switch storage volume',
-                icon: Icon(Icons.sd_storage_rounded, color: _accent, size: 19),
-                onSelected: (path) {
-                  final volume = Directory(path);
-                  setState(() => _root = volume);
-                  _loadDirectory(volume);
-                },
-                itemBuilder: (context) => _storageRoots.map((path) =>
-                  PopupMenuItem(value: path, child: Text(path, maxLines: 1, overflow: TextOverflow.ellipsis))).toList(),
-              ),
-              PopupMenuButton<String>(
-                tooltip: 'File display method',
-                onSelected: (value) => setState(() => _viewMode = value),
-                itemBuilder: (context) => const [
-                  PopupMenuItem(value: 'List', child: Text('List view')),
-                  PopupMenuItem(value: 'Compact', child: Text('Compact view')),
-                  PopupMenuItem(value: 'Grid', child: Text('Grid view')),
-                  PopupMenuItem(value: 'Large thumbnails', child: Text('Large thumbnails')),
-                ],
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
-                  child: Icon(Icons.grid_view_rounded, color: _accent, size: 19),
+        Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 19),
+            child: _glass(
+              child: Column(children: [
+                TextField(
+                  decoration: const InputDecoration(
+                      hintText: 'Search this folder',
+                      prefixIcon: Icon(Icons.search_rounded),
+                      border: InputBorder.none,
+                      isDense: true),
+                  onChanged: (value) => setState(() => _search = value),
                 ),
-              ),
-              PopupMenuButton<String>(
-                tooltip: 'Sort files',
-                onSelected: (value) => setState(() {
-                  if (value == 'Folders first' || value == 'No folder priority') {
-                    _foldersFirst = value == 'Folders first';
-                  } else if (value == 'Ascending' || value == 'Descending') {
-                    _sortDescending = value == 'Descending';
-                  } else {
-                    _sortMode = value;
-                  }
-                }),
-                itemBuilder: (context) => const [
-                  PopupMenuItem(value: 'Name', child: Text('Sort by name')),
-                  PopupMenuItem(value: 'Size', child: Text('Sort by size')),
-                  PopupMenuItem(value: 'Date', child: Text('Sort by date')),
-                  PopupMenuItem(value: 'Type', child: Text('Sort by type')),
-                  PopupMenuItem(value: 'Ascending', child: Text('Ascending')),
-                  PopupMenuItem(value: 'Descending', child: Text('Descending')),
-                  PopupMenuDivider(),
-                  PopupMenuItem(value: 'Folders first', child: Text('Folders first')),
-                  PopupMenuItem(value: 'No folder priority', child: Text('No folder priority')),
-                ],
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  child: Text('Sort: $_sortMode ${_sortDescending ? '↓' : '↑'}', style: TextStyle(fontSize: 10, color: _accent)),
-                ),
-              ),
-            ]),
-          ]),
-        )),
+                Row(children: [
+                  IconButton(
+                      onPressed: () {
+                        if (_current.path != _root.path) {
+                          _loadDirectory(_current.parent);
+                        }
+                      },
+                      icon: const Icon(Icons.arrow_back_rounded, size: 19)),
+                  Expanded(
+                      child: Text(_current.path,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 10, color: Colors.white60))),
+                  PopupMenuButton<String>(
+                    tooltip: 'Switch storage volume',
+                    icon: Icon(Icons.sd_storage_rounded,
+                        color: _accent, size: 19),
+                    onSelected: (path) {
+                      final volume = Directory(path);
+                      setState(() => _root = volume);
+                      _loadDirectory(volume);
+                    },
+                    itemBuilder: (context) => _storageRoots
+                        .map((path) => PopupMenuItem(
+                            value: path,
+                            child: Text(path,
+                                maxLines: 1, overflow: TextOverflow.ellipsis)))
+                        .toList(),
+                  ),
+                  PopupMenuButton<String>(
+                    tooltip: 'File display method',
+                    onSelected: (value) => setState(() => _viewMode = value),
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(value: 'List', child: Text('List view')),
+                      PopupMenuItem(
+                          value: 'Compact', child: Text('Compact view')),
+                      PopupMenuItem(value: 'Grid', child: Text('Grid view')),
+                      PopupMenuItem(
+                          value: 'Large thumbnails',
+                          child: Text('Large thumbnails')),
+                    ],
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 6),
+                      child: Icon(Icons.grid_view_rounded,
+                          color: _accent, size: 19),
+                    ),
+                  ),
+                  PopupMenuButton<String>(
+                    tooltip: 'Sort files',
+                    onSelected: (value) => setState(() {
+                      if (value == 'Folders first' ||
+                          value == 'No folder priority') {
+                        _foldersFirst = value == 'Folders first';
+                      } else if (value == 'Ascending' ||
+                          value == 'Descending') {
+                        _sortDescending = value == 'Descending';
+                      } else {
+                        _sortMode = value;
+                      }
+                    }),
+                    itemBuilder: (context) => const [
+                      PopupMenuItem(value: 'Name', child: Text('Sort by name')),
+                      PopupMenuItem(value: 'Size', child: Text('Sort by size')),
+                      PopupMenuItem(value: 'Date', child: Text('Sort by date')),
+                      PopupMenuItem(value: 'Type', child: Text('Sort by type')),
+                      PopupMenuItem(
+                          value: 'Ascending', child: Text('Ascending')),
+                      PopupMenuItem(
+                          value: 'Descending', child: Text('Descending')),
+                      PopupMenuDivider(),
+                      PopupMenuItem(
+                          value: 'Folders first', child: Text('Folders first')),
+                      PopupMenuItem(
+                          value: 'No folder priority',
+                          child: Text('No folder priority')),
+                    ],
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 6),
+                      child: Text(
+                          'Sort: $_sortMode ${_sortDescending ? '↓' : '↑'}',
+                          style: TextStyle(fontSize: 10, color: _accent)),
+                    ),
+                  ),
+                ]),
+              ]),
+            )),
         if (_directoryWarning != null)
           Padding(
             padding: const EdgeInsets.fromLTRB(19, 8, 19, 0),
-            child: _glass(child: Row(children: [
+            child: _glass(
+                child: Row(children: [
               Icon(Icons.info_outline_rounded, color: _accent, size: 19),
               const SizedBox(width: 9),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(_directoryWarning!, style: const TextStyle(fontSize: 11, height: 1.4)),
-                TextButton.icon(
-                  onPressed: _pickFilesWithoutAllAccess,
-                  icon: const Icon(Icons.file_open_rounded, size: 16),
-                  label: const Text('Pick individual files'),
-                ),
-              ])),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(_directoryWarning!,
+                        style: const TextStyle(fontSize: 11, height: 1.4)),
+                    TextButton.icon(
+                      onPressed: _pickFilesWithoutAllAccess,
+                      icon: const Icon(Icons.file_open_rounded, size: 16),
+                      label: const Text('Pick individual files'),
+                    ),
+                  ])),
               IconButton(
                 tooltip: 'Dismiss folder access message',
                 onPressed: () => setState(() => _directoryWarning = null),
@@ -1874,89 +2253,154 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
             ])),
           ),
         const SizedBox(height: 8),
-        Expanded(child: _categoryScanBusy
-          ? const Center(child: CircularProgressIndicator())
-          : visibleItems.isEmpty
-          ? const Center(child: Text('No matching files found', style: TextStyle(color: Colors.white54)))
-          : _viewMode == 'Grid' || _viewMode == 'Large thumbnails'
-          ? GridView.builder(
-              key: const PageStorageKey<String>('files-grid'),
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: _viewMode == 'Large thumbnails' ? 2 : 3,
-                crossAxisSpacing: 9, mainAxisSpacing: 9,
-                childAspectRatio: _viewMode == 'Large thumbnails' ? .82 : .88,
-              ),
-              itemCount: visibleItems.length,
-              itemBuilder: (context, index) {
-                final item = visibleItems[index];
-                final isFolder = item is Directory;
-                return InkWell(
-                  onTap: () => _openEntity(item),
-                  borderRadius: BorderRadius.circular(17),
-                  child: _glass(child: Column(children: [
-                    Expanded(child: isFolder
-                      ? Icon(Icons.folder_rounded, color: _accent, size: 54)
-                      : MediaThumbnail(key: ValueKey(item.path), path: item.path, accent: _accent, size: _viewMode == 'Large thumbnails' ? 126 : 88)),
-                    Padding(padding: const EdgeInsets.fromLTRB(6, 5, 6, 7),
-                      child: Text(_nameOf(item), maxLines: 2, overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600))),
-                  ])),
-                );
-              },
-            )
-          : ListView.builder(
-              key: PageStorageKey<String>('files-list-$_viewMode'),
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
-              itemCount: visibleItems.length,
-              itemBuilder: (context, index) {
-                final item = visibleItems[index];
-                final isFolder = item is Directory;
-                return Padding(
-                  padding: EdgeInsets.only(bottom: _viewMode == 'Compact' ? 3 : 7),
-                  child: _glass(child: Row(children: [
-                    isFolder
-                      ? Icon(Icons.folder_rounded, color: _accent, size: 25)
-                      : MediaThumbnail(
-                          key: ValueKey(item.path),
-                          path: item.path,
-                          accent: _accent,
-                          size: _viewMode == 'Compact' ? 34 : 50,
-                        ),
-                    SizedBox(width: _viewMode == 'Compact' ? 7 : 11),
-                    Expanded(child: InkWell(
-                      onTap: () => _openEntity(item),
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(_nameOf(item), maxLines: 1, overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w600)),
-                        Text(isFolder ? 'Folder' : 'File',
-                          style: const TextStyle(fontSize: 10, color: Colors.white54)),
-                      ]),
-                    )),
-                    PopupMenuButton<String>(
-                      onSelected: (value) {
-                        if (value == 'rename') _rename(item);
-                        if (value == 'details') _showDetails(item);
-                        if (value == 'copy') _moveEntityToClipboard(item, move: false);
-                        if (value == 'cut') _moveEntityToClipboard(item, move: true);
-                        if (value == 'delete') _sendToRecycleBin(item);
-                        if (value == 'share') _shareEntity(item);
-                        if (value == 'folder_pin' && item is Directory) _setFolderPin(item);
-                      },
-                      itemBuilder: (context) => [
-                        if (item is Directory) const PopupMenuItem(value: 'folder_pin', child: Text('Set / remove in-app Folder PIN')),
-                        const PopupMenuItem(value: 'copy', child: Text('Copy')),
-                        PopupMenuItem(value: 'cut', child: Text('Cut')),
-                        PopupMenuItem(value: 'rename', child: Text('Rename')),
-                        PopupMenuItem(value: 'delete', child: Text('Move to Recycle Bin')),
-                        PopupMenuItem(value: 'share', child: Text('Share')),
-                        PopupMenuItem(value: 'details', child: Text('Properties')),
-                      ],
-                    ),
-                  ])),
-                );
-              },
-            )),
+        Expanded(
+            child: _categoryScanBusy
+                ? const Center(child: CircularProgressIndicator())
+                : visibleItems.isEmpty
+                    ? const Center(
+                        child: Text('No matching files found',
+                            style: TextStyle(color: Colors.white54)))
+                    : _viewMode == 'Grid' || _viewMode == 'Large thumbnails'
+                        ? GridView.builder(
+                            key: const PageStorageKey<String>('files-grid'),
+                            padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount:
+                                  _viewMode == 'Large thumbnails' ? 2 : 3,
+                              crossAxisSpacing: 9,
+                              mainAxisSpacing: 9,
+                              childAspectRatio:
+                                  _viewMode == 'Large thumbnails' ? .82 : .88,
+                            ),
+                            itemCount: visibleItems.length,
+                            itemBuilder: (context, index) {
+                              final item = visibleItems[index];
+                              final isFolder = item is Directory;
+                              return InkWell(
+                                onTap: () => _openEntity(item),
+                                borderRadius: BorderRadius.circular(17),
+                                child: _glass(
+                                    child: Column(children: [
+                                  Expanded(
+                                      child: isFolder
+                                          ? Icon(Icons.folder_rounded,
+                                              color: _accent, size: 54)
+                                          : MediaThumbnail(
+                                              key: ValueKey(item.path),
+                                              path: item.path,
+                                              accent: _accent,
+                                              size: _viewMode ==
+                                                      'Large thumbnails'
+                                                  ? 126
+                                                  : 88)),
+                                  Padding(
+                                      padding:
+                                          const EdgeInsets.fromLTRB(6, 5, 6, 7),
+                                      child: Text(_nameOf(item),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600))),
+                                ])),
+                              );
+                            },
+                          )
+                        : ListView.builder(
+                            key:
+                                PageStorageKey<String>('files-list-$_viewMode'),
+                            padding: const EdgeInsets.fromLTRB(18, 0, 18, 16),
+                            itemCount: visibleItems.length,
+                            itemBuilder: (context, index) {
+                              final item = visibleItems[index];
+                              final isFolder = item is Directory;
+                              return Padding(
+                                padding: EdgeInsets.only(
+                                    bottom: _viewMode == 'Compact' ? 3 : 7),
+                                child: _glass(
+                                    child: Row(children: [
+                                  isFolder
+                                      ? Icon(Icons.folder_rounded,
+                                          color: _accent, size: 25)
+                                      : MediaThumbnail(
+                                          key: ValueKey(item.path),
+                                          path: item.path,
+                                          accent: _accent,
+                                          size:
+                                              _viewMode == 'Compact' ? 34 : 50,
+                                        ),
+                                  SizedBox(
+                                      width: _viewMode == 'Compact' ? 7 : 11),
+                                  Expanded(
+                                      child: InkWell(
+                                    onTap: () => _openEntity(item),
+                                    child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(_nameOf(item),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.w600)),
+                                          Text(isFolder ? 'Folder' : 'File',
+                                              style: const TextStyle(
+                                                  fontSize: 10,
+                                                  color: Colors.white54)),
+                                        ]),
+                                  )),
+                                  PopupMenuButton<String>(
+                                    onSelected: (value) {
+                                      if (value == 'rename') _rename(item);
+                                      if (value == 'details') {
+                                        _showDetails(item);
+                                      }
+                                      if (value == 'copy') {
+                                        _moveEntityToClipboard(item,
+                                            move: false);
+                                      }
+                                      if (value == 'cut') {
+                                        _moveEntityToClipboard(item,
+                                            move: true);
+                                      }
+                                      if (value == 'delete') {
+                                        _sendToRecycleBin(item);
+                                      }
+                                      if (value == 'share') _shareEntity(item);
+                                      if (value == 'folder_pin' &&
+                                          item is Directory) {
+                                        _setFolderPin(item);
+                                      }
+                                    },
+                                    itemBuilder: (context) => [
+                                      if (item is Directory)
+                                        const PopupMenuItem(
+                                            value: 'folder_pin',
+                                            child: Text(
+                                                'Set / remove in-app Folder PIN')),
+                                      const PopupMenuItem(
+                                          value: 'copy', child: Text('Copy')),
+                                      const PopupMenuItem(
+                                          value: 'cut', child: Text('Cut')),
+                                      const PopupMenuItem(
+                                          value: 'rename',
+                                          child: Text('Rename')),
+                                      const PopupMenuItem(
+                                          value: 'delete',
+                                          child: Text('Move to Recycle Bin')),
+                                      const PopupMenuItem(
+                                          value: 'share', child: Text('Share')),
+                                      const PopupMenuItem(
+                                          value: 'details',
+                                          child: Text('Properties')),
+                                    ],
+                                  ),
+                                ])),
+                              );
+                            },
+                          )),
       ],
     ]);
   }
@@ -1966,119 +2410,224 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
       key: const PageStorageKey<String>('recycle-bin-page'),
       padding: const EdgeInsets.fromLTRB(19, 10, 19, 22),
       children: [
-        Text('Recycle Bin', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: foreground)),
+        Text('Recycle Bin',
+            style: TextStyle(
+                fontSize: 28, fontWeight: FontWeight.w800, color: foreground)),
         const SizedBox(height: 8),
-        const Text('Items stay here for 30 days. Choosing Delete again starts a separate 2-hour recovery period.',
-          style: TextStyle(fontSize: 12, color: Colors.white60, height: 1.4)),
+        const Text(
+            'Items stay here for 30 days. Choosing Delete again starts a separate 2-hour recovery period.',
+            style: TextStyle(fontSize: 12, color: Colors.white60, height: 1.4)),
         const SizedBox(height: 14),
         if (_recycleRecords.isEmpty)
-          _glass(child: const Text('Recycle Bin is empty.', style: TextStyle(color: Colors.white70)))
-        else ..._recycleRecords.map((record) => Padding(
-          padding: const EdgeInsets.only(bottom: 9),
-          child: _glass(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(record['name'] as String? ?? 'File', maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 5),
-            Text((record['stage'] == 'shred' ? 'Temporary recovery • ' : 'Recycle Bin • ') + _remainingTime(record),
-              style: TextStyle(fontSize: 11, color: _accent)),
-            const SizedBox(height: 8),
-            Row(children: [
-              TextButton(onPressed: () => _restoreRecycleRecord(record), child: const Text('Restore')),
-              const Spacer(),
-              if (record['stage'] != 'shred')
-                TextButton(onPressed: () => _deleteAgainForTwoHours(record), child: const Text('Delete again')),
-            ]),
-          ])),
-        )),
+          _glass(
+              child: const Text('Recycle Bin is empty.',
+                  style: TextStyle(color: Colors.white70)))
+        else
+          ..._recycleRecords.map((record) => Padding(
+                padding: const EdgeInsets.only(bottom: 9),
+                child: _glass(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(record['name'] as String? ?? 'File',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 5),
+                      Text(
+                          (record['stage'] == 'shred'
+                                  ? 'Temporary recovery • '
+                                  : 'Recycle Bin • ') +
+                              _remainingTime(record),
+                          style: TextStyle(fontSize: 11, color: _accent)),
+                      const SizedBox(height: 8),
+                      Row(children: [
+                        TextButton(
+                            onPressed: () => _restoreRecycleRecord(record),
+                            child: const Text('Restore')),
+                        const Spacer(),
+                        if (record['stage'] != 'shred')
+                          TextButton(
+                              onPressed: () => _deleteAgainForTwoHours(record),
+                              child: const Text('Delete again')),
+                      ]),
+                    ])),
+              )),
       ],
     );
   }
 
   Widget _settings(Color foreground) => ListView(
-    key: const PageStorageKey<String>('settings-page'),
-    padding: const EdgeInsets.fromLTRB(19, 10, 19, 22),
-    children: [
-      Text('Settings', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: foreground)),
-      const SizedBox(height: 17),
-      _glass(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('ACCENT COLOR', style: TextStyle(fontSize: 10, letterSpacing: 1.8, color: Colors.white60)),
-        const SizedBox(height: 16),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: List.generate(aquaAccents.length, (i) =>
-          GestureDetector(onTap: () => setState(() => _theme = i),
-            child: AnimatedContainer(duration: const Duration(milliseconds: 180),
-              width: 43, height: 43,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: aquaAccents[i],
-                border: Border.all(color: _theme == i ? Colors.white : Colors.transparent, width: 3),
-                boxShadow: [BoxShadow(color: aquaAccents[i].withOpacity(.25), blurRadius: 13)]),
-              child: _theme == i ? const Icon(Icons.check_rounded, color: Color(0xFF06202A)) : null))),
-        ),
-      ])),
-      const SizedBox(height: 12),
-      _switchTile('Show hidden files', 'Include dot-prefixed files and folders', _showHidden,
-        (v) => setState(() => _showHidden = v)),
-      _switchTile('Gravity bubbles', 'Move with your phone tilt sensor', _gravity,
-        (v) => setState(() => _gravity = v)),
-      _switchTile('Bubbles', 'Show or hide floating bubbles and bubble effects', _animations,
-        (v) => setState(() => _animations = v)),
-      _switchTile('Water', 'Show or hide the liquid layer inside every glass card', _waterEnabled,
-        (v) => setState(() => _waterEnabled = v)),
-      _switchTile('Performance mode', 'Use fewer bubbles and less motion work', _performance,
-        (v) => setState(() => _performance = v)),
-      const SizedBox(height: 10),
-      _glass(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Expanded(child: Text('BUBBLE MOVEMENT SPEED',
-            style: TextStyle(fontSize: 10, letterSpacing: 1.5, color: Colors.white60))),
-          Text('${_bubbleSpeed.toStringAsFixed(1)}×',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: _accent)),
-        ]),
-        Slider(
-          value: _bubbleSpeed.clamp(.1, 3.0),
-          min: .1,
-          max: 3.0,
-          // Continuous slider: users can choose any speed, not fixed steps.
-          activeColor: _accent,
-          onChanged: (value) => setState(() => _bubbleSpeed = value),
-        ),
-        const Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('0.1×  Very slow', style: TextStyle(fontSize: 10, color: Colors.white54)),
-          Text('3.0×  Very fast', style: TextStyle(fontSize: 10, color: Colors.white54)),
-        ]),
-      ])),
-      _switchTile('Light appearance', 'Switch the interface brightness', _light,
-        (v) => setState(() => _light = v)),
-      const SizedBox(height: 12),
-      _glass(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('STORAGE ACCESS', style: TextStyle(fontSize: 10, letterSpacing: 1.8, color: Colors.white60)),
-        const SizedBox(height: 8),
-        Text(_storageMessage, style: const TextStyle(fontSize: 12, color: Colors.white70)),
-        Align(alignment: Alignment.centerRight,
-          child: TextButton(onPressed: _requestStorage, child: const Text('Check permission'))),
-      ])),
-      const SizedBox(height: 12),
-      _glass(child: const Text(
-        'Bubble File Manager • Development build\n'
-        'Includes storage browsing, file operations, bubble physics, two-stage Recycle Bin, hidden files and SHA-256 duplicate scanning. '
-        'Advanced Tools add encrypted Vault, ZIP, selected-photo GPS maps, removable-storage file import and cleanup suggestions. '
-        'Automatic face similarity albums still require a bundled offline embedding model and validation on real devices.',
-        style: TextStyle(fontSize: 11, color: Colors.white60, height: 1.55))),
-    ],
-  );
+        key: const PageStorageKey<String>('settings-page'),
+        padding: const EdgeInsets.fromLTRB(19, 10, 19, 22),
+        children: [
+          Text('Settings',
+              style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: foreground)),
+          const SizedBox(height: 17),
+          _glass(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                const Text('ACCENT COLOR',
+                    style: TextStyle(
+                        fontSize: 10,
+                        letterSpacing: 1.8,
+                        color: Colors.white60)),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: List.generate(
+                      aquaAccents.length,
+                      (i) => GestureDetector(
+                          onTap: () => setState(() => _theme = i),
+                          child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: 43,
+                              height: 43,
+                              decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: aquaAccents[i],
+                                  border: Border.all(
+                                      color: _theme == i
+                                          ? Colors.white
+                                          : Colors.transparent,
+                                      width: 3),
+                                  boxShadow: [
+                                    BoxShadow(
+                                        color: aquaAccents[i]
+                                            .withValues(alpha: .25),
+                                        blurRadius: 13)
+                                  ]),
+                              child: _theme == i
+                                  ? const Icon(Icons.check_rounded,
+                                      color: Color(0xFF06202A))
+                                  : null))),
+                ),
+              ])),
+          const SizedBox(height: 12),
+          _switchTile(
+              'Show hidden files',
+              'Include dot-prefixed files and folders',
+              _showHidden,
+              (v) => setState(() => _showHidden = v)),
+          _switchTile('Gravity bubbles', 'Move with your phone tilt sensor',
+              _gravity, (v) => setState(() => _gravity = v)),
+          _switchTile(
+              'Bubbles',
+              'Show or hide floating bubbles and bubble effects',
+              _animations,
+              (v) => setState(() => _animations = v)),
+          _switchTile(
+              'Water',
+              'Show or hide the liquid layer inside every glass card',
+              _waterEnabled,
+              (v) => setState(() => _waterEnabled = v)),
+          _switchTile(
+              'Performance mode',
+              'Use fewer bubbles and less motion work',
+              _performance,
+              (v) => setState(() => _performance = v)),
+          const SizedBox(height: 10),
+          _glass(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                Row(children: [
+                  const Expanded(
+                      child: Text('BUBBLE MOVEMENT SPEED',
+                          style: TextStyle(
+                              fontSize: 10,
+                              letterSpacing: 1.5,
+                              color: Colors.white60))),
+                  Text('${_bubbleSpeed.toStringAsFixed(1)}×',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: _accent)),
+                ]),
+                Slider(
+                  value: _bubbleSpeed.clamp(.1, 3.0),
+                  min: .1,
+                  max: 3.0,
+                  // Continuous slider: users can choose any speed, not fixed steps.
+                  activeColor: _accent,
+                  onChanged: (value) => setState(() => _bubbleSpeed = value),
+                ),
+                const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('0.1×  Very slow',
+                          style:
+                              TextStyle(fontSize: 10, color: Colors.white54)),
+                      Text('3.0×  Very fast',
+                          style:
+                              TextStyle(fontSize: 10, color: Colors.white54)),
+                    ]),
+              ])),
+          _switchTile('Light appearance', 'Switch the interface brightness',
+              _light, (v) => setState(() => _light = v)),
+          const SizedBox(height: 12),
+          _glass(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                const Text('STORAGE ACCESS',
+                    style: TextStyle(
+                        fontSize: 10,
+                        letterSpacing: 1.8,
+                        color: Colors.white60)),
+                const SizedBox(height: 8),
+                Text(_storageMessage,
+                    style:
+                        const TextStyle(fontSize: 12, color: Colors.white70)),
+                Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                        onPressed: _requestStorage,
+                        child: const Text('Check permission'))),
+              ])),
+          const SizedBox(height: 12),
+          _glass(
+              child: const Text(
+                  'Bubble File Manager • Development build\n'
+                  'Includes storage browsing, file operations, bubble physics, two-stage Recycle Bin, hidden files and SHA-256 duplicate scanning. '
+                  'Advanced Tools add encrypted Vault, ZIP, selected-photo GPS maps, removable-storage file import and cleanup suggestions. '
+                  'Automatic face similarity albums still require a bundled offline embedding model and validation on real devices.',
+                  style: TextStyle(
+                      fontSize: 11, color: Colors.white60, height: 1.55))),
+        ],
+      );
 
-  Widget _switchTile(String title, String subtitle, bool value, ValueChanged<bool> onChanged) =>
-    Padding(padding: const EdgeInsets.only(bottom: 9), child: _glass(child: SwitchListTile(
-      contentPadding: EdgeInsets.zero, value: value, onChanged: onChanged,
-      activeColor: _accent, title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-      subtitle: Text(subtitle, style: const TextStyle(fontSize: 10, color: Colors.white54)),
-    )));
+  Widget _switchTile(String title, String subtitle, bool value,
+          ValueChanged<bool> onChanged) =>
+      Padding(
+          padding: const EdgeInsets.only(bottom: 9),
+          child: _glass(
+              child: SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: value,
+            onChanged: onChanged,
+            activeThumbColor: _accent,
+            title: Text(title,
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            subtitle: Text(subtitle,
+                style: const TextStyle(fontSize: 10, color: Colors.white54)),
+          )));
 
   Widget _glass({required Widget child}) {
     final radius = BorderRadius.circular(23);
     final content = Stack(
       children: [
-        Padding(padding: const EdgeInsets.all(15), child: Material(
-          color: Colors.transparent, child: child)),
-        Positioned.fill(child: IgnorePointer(child: CustomPaint(
+        Padding(
+            padding: const EdgeInsets.all(15),
+            child: Material(color: Colors.transparent, child: child)),
+        Positioned.fill(
+            child: IgnorePointer(
+                child: CustomPaint(
           painter: _LiquidSurfacePainter(
             accent: _accent,
             tilt: _waterTilt,
@@ -2093,9 +2642,10 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
         borderRadius: radius,
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(.075),
+            color: Colors.white.withValues(alpha: .075),
             borderRadius: radius,
-            border: Border.all(color: Colors.white.withOpacity(.15), width: 1),
+            border: Border.all(
+                color: Colors.white.withValues(alpha: .15), width: 1),
           ),
           child: content,
         ),
@@ -2107,11 +2657,19 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
         filter: ui.ImageFilter.blur(sigmaX: 26, sigmaY: 26),
         child: Container(
           decoration: BoxDecoration(
-            gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
-              colors: [Colors.white.withOpacity(.14), Colors.white.withOpacity(.045)]),
+            gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: .14),
+                  Colors.white.withValues(alpha: .045)
+                ]),
             borderRadius: radius,
-            border: Border.all(color: Colors.white.withOpacity(.17), width: 1),
-            boxShadow: [BoxShadow(color: _accent.withOpacity(.055), blurRadius: 24)],
+            border: Border.all(
+                color: Colors.white.withValues(alpha: .17), width: 1),
+            boxShadow: [
+              BoxShadow(color: _accent.withValues(alpha: .055), blurRadius: 24)
+            ],
           ),
           child: content,
         ),
@@ -2120,39 +2678,46 @@ class _AquaAppState extends State<AquaApp> with WidgetsBindingObserver {
   }
 
   Widget _bottomNav(Color foreground) => Padding(
-    padding: const EdgeInsets.fromLTRB(19, 7, 19, 11),
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(25),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: _performance ? 0 : 22, sigmaY: _performance ? 0 : 22),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 7),
-          decoration: BoxDecoration(
-            color: const Color(0xCC0C2835),
-            borderRadius: BorderRadius.circular(25),
-            border: Border.all(color: Colors.white.withOpacity(.15)),
+        padding: const EdgeInsets.fromLTRB(19, 7, 19, 11),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(25),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(
+                sigmaX: _performance ? 0 : 22, sigmaY: _performance ? 0 : 22),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 7),
+              decoration: BoxDecoration(
+                color: const Color(0xCC0C2835),
+                borderRadius: BorderRadius.circular(25),
+                border: Border.all(color: Colors.white.withValues(alpha: .15)),
+              ),
+              child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _navItem('Home', Icons.water_drop_rounded, 0),
+                    _navItem('Files', Icons.folder_rounded, 1),
+                    _navItem('Settings', Icons.settings_rounded, 2),
+                    _navItem('Bin', Icons.delete_outline_rounded, 3),
+                  ]),
+            ),
           ),
-          child: Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-            _navItem('Home', Icons.water_drop_rounded, 0),
-            _navItem('Files', Icons.folder_rounded, 1),
-            _navItem('Settings', Icons.settings_rounded, 2),
-            _navItem('Bin', Icons.delete_outline_rounded, 3),
-          ]),
         ),
-      ),
-    ),
-  );
+      );
 
   Widget _navItem(String label, IconData icon, int index) => InkWell(
-    onTap: () => _selectTab(index),
-    borderRadius: BorderRadius.circular(17),
-    child: Padding(padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 6),
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, color: _tab == index ? _accent : Colors.white54),
-        Text(label, style: TextStyle(fontSize: 10,
-          color: _tab == index ? _accent : Colors.white54, fontWeight: FontWeight.w600)),
-      ])),
-  );
+        onTap: () => _selectTab(index),
+        borderRadius: BorderRadius.circular(17),
+        child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 6),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Icon(icon, color: _tab == index ? _accent : Colors.white54),
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: _tab == index ? _accent : Colors.white54,
+                      fontWeight: FontWeight.w600)),
+            ])),
+      );
 }
 
 class BubbleSplashScreen extends StatefulWidget {
@@ -2191,7 +2756,11 @@ class _BubbleSplashScreenState extends State<BubbleSplashScreen>
                   gradient: RadialGradient(
                     center: Alignment(0, -.12),
                     radius: 1.15,
-                    colors: [Color(0xFF0B4650), Color(0xFF062A34), Color(0xFF03151E)],
+                    colors: [
+                      Color(0xFF0B4650),
+                      Color(0xFF062A34),
+                      Color(0xFF03151E)
+                    ],
                   ),
                 ),
               ),
@@ -2208,9 +2777,17 @@ class _BubbleSplashScreenState extends State<BubbleSplashScreen>
                       height: 9 + (i % 4) * 7,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFF9CFFF4).withOpacity(.10 + (i % 3) * .035),
-                        border: Border.all(color: const Color(0xFF9CFFF4).withOpacity(.34)),
-                        boxShadow: [BoxShadow(color: const Color(0xFF54F5E7).withOpacity(.15), blurRadius: 12)],
+                        color: const Color(0xFF9CFFF4)
+                            .withValues(alpha: .10 + (i % 3) * .035),
+                        border: Border.all(
+                            color:
+                                const Color(0xFF9CFFF4).withValues(alpha: .34)),
+                        boxShadow: [
+                          BoxShadow(
+                              color: const Color(0xFF54F5E7)
+                                  .withValues(alpha: .15),
+                              blurRadius: 12)
+                        ],
                       ),
                     ),
                   ),
@@ -2238,19 +2815,33 @@ class _BubbleSplashScreenState extends State<BubbleSplashScreen>
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                     colors: [
-                                      const Color(0xFFB9FFF5).withOpacity(.46),
-                                      const Color(0xFF4DDDD5).withOpacity(.16),
-                                      const Color(0xFFB9FFF5).withOpacity(.30),
+                                      const Color(0xFFB9FFF5)
+                                          .withValues(alpha: .46),
+                                      const Color(0xFF4DDDD5)
+                                          .withValues(alpha: .16),
+                                      const Color(0xFFB9FFF5)
+                                          .withValues(alpha: .30),
                                     ],
                                   ),
-                                  border: Border.all(color: const Color(0xFF8DFFF4), width: 3),
+                                  border: Border.all(
+                                      color: const Color(0xFF8DFFF4), width: 3),
                                   boxShadow: [
-                                    BoxShadow(color: const Color(0xFF36F5E6).withOpacity(.34), blurRadius: 35, spreadRadius: 3),
-                                    BoxShadow(color: Colors.white.withOpacity(.10), blurRadius: 9, spreadRadius: -2),
+                                    BoxShadow(
+                                        color: const Color(0xFF36F5E6)
+                                            .withValues(alpha: .34),
+                                        blurRadius: 35,
+                                        spreadRadius: 3),
+                                    BoxShadow(
+                                        color:
+                                            Colors.white.withValues(alpha: .10),
+                                        blurRadius: 9,
+                                        spreadRadius: -2),
                                   ],
                                 ),
-                                child: Icon(Icons.folder_rounded, size: 112,
-                                  color: const Color(0xFFD6FFFA).withOpacity(.82)),
+                                child: Icon(Icons.folder_rounded,
+                                    size: 112,
+                                    color: const Color(0xFFD6FFFA)
+                                        .withValues(alpha: .82)),
                               ),
                               for (var i = 0; i < 6; i++)
                                 Positioned(
@@ -2262,11 +2853,19 @@ class _BubbleSplashScreenState extends State<BubbleSplashScreen>
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       gradient: RadialGradient(colors: [
-                                        Colors.white.withOpacity(.95),
-                                        const Color(0xFF7CFFF2).withOpacity(.20),
+                                        Colors.white.withValues(alpha: .95),
+                                        const Color(0xFF7CFFF2)
+                                            .withValues(alpha: .20),
                                       ]),
-                                      border: Border.all(color: Colors.white.withOpacity(.65)),
-                                      boxShadow: [BoxShadow(color: const Color(0xFF70FFF2).withOpacity(.4), blurRadius: 10)],
+                                      border: Border.all(
+                                          color: Colors.white
+                                              .withValues(alpha: .65)),
+                                      boxShadow: [
+                                        BoxShadow(
+                                            color: const Color(0xFF70FFF2)
+                                                .withValues(alpha: .4),
+                                            blurRadius: 10)
+                                      ],
                                     ),
                                   ),
                                 ),
@@ -2277,22 +2876,34 @@ class _BubbleSplashScreenState extends State<BubbleSplashScreen>
                     ),
                     const SizedBox(height: 23),
                     const Text('BUBBLE',
-                      style: TextStyle(fontSize: 43, fontWeight: FontWeight.w900,
-                        letterSpacing: 3.5, color: Color(0xFF9CFFF0),
-                        shadows: [Shadow(color: Color(0xFF36DCCF), blurRadius: 22)])),
+                        style: TextStyle(
+                            fontSize: 43,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 3.5,
+                            color: Color(0xFF9CFFF0),
+                            shadows: [
+                              Shadow(color: Color(0xFF36DCCF), blurRadius: 22)
+                            ])),
                     const SizedBox(height: 2),
                     const Text('FILE MANAGER',
-                      style: TextStyle(fontSize: 19, letterSpacing: 4.0,
-                        fontWeight: FontWeight.w300, color: Color(0xFFE3FFFC))),
+                        style: TextStyle(
+                            fontSize: 19,
+                            letterSpacing: 4.0,
+                            fontWeight: FontWeight.w300,
+                            color: Color(0xFFE3FFFC))),
                     const SizedBox(height: 22),
                     Text('Safety and Relax File Management System',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 10, letterSpacing: .6,
-                        color: Colors.white.withOpacity(.72))),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontSize: 10,
+                            letterSpacing: .6,
+                            color: Colors.white.withValues(alpha: .72))),
                     const SizedBox(height: 7),
                     Text('Created by H.G.Aluthge',
-                      style: TextStyle(fontSize: 10, letterSpacing: 1.1,
-                        color: Colors.white.withOpacity(.52))),
+                        style: TextStyle(
+                            fontSize: 10,
+                            letterSpacing: 1.1,
+                            color: Colors.white.withValues(alpha: .52))),
                   ],
                 ),
               ),
@@ -2302,10 +2913,11 @@ class _BubbleSplashScreenState extends State<BubbleSplashScreen>
                 right: 0,
                 child: Center(
                   child: SizedBox(
-                    width: 28, height: 2,
+                    width: 28,
+                    height: 2,
                     child: LinearProgressIndicator(
                       value: null,
-                      backgroundColor: Colors.white.withOpacity(.10),
+                      backgroundColor: Colors.white.withValues(alpha: .10),
                       color: const Color(0xFF8DFFF4),
                       minHeight: 2,
                     ),
@@ -2325,17 +2937,35 @@ class AquaBackdrop extends StatelessWidget {
   final bool reduced;
   @override
   Widget build(BuildContext context) => DecoratedBox(
-    decoration: const BoxDecoration(
-      color: Color(0xFF04141E),
-      gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
-        colors: [Color(0xFF071E2A), Color(0xFF04141E), Color(0xFF031018)]),
-    ),
-    child: Stack(children: [
-      Positioned(left: -100, top: -100, child: _Glow(color: const Color(0x4420E4E8), size: 310, reduced: reduced)),
-      Positioned(right: -130, top: 80, child: _Glow(color: const Color(0x222E83C5), size: 330, reduced: reduced)),
-      Positioned(bottom: -160, left: 20, child: _Glow(color: const Color(0x2221B8A8), size: 390, reduced: reduced)),
-    ]),
-  );
+        decoration: const BoxDecoration(
+          color: Color(0xFF04141E),
+          gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFF071E2A),
+                Color(0xFF04141E),
+                Color(0xFF031018)
+              ]),
+        ),
+        child: Stack(children: [
+          Positioned(
+              left: -100,
+              top: -100,
+              child: _Glow(
+                  color: const Color(0x4420E4E8), size: 310, reduced: reduced)),
+          Positioned(
+              right: -130,
+              top: 80,
+              child: _Glow(
+                  color: const Color(0x222E83C5), size: 330, reduced: reduced)),
+          Positioned(
+              bottom: -160,
+              left: 20,
+              child: _Glow(
+                  color: const Color(0x2221B8A8), size: 390, reduced: reduced)),
+        ]),
+      );
 }
 
 class _Glow extends StatelessWidget {
@@ -2345,20 +2975,25 @@ class _Glow extends StatelessWidget {
   final bool reduced;
   @override
   Widget build(BuildContext context) {
-    final circle = Container(width: size, height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color));
+    final circle = Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(shape: BoxShape.circle, color: color));
     // Static soft color is cheaper than a full-screen image blur.
-    return reduced ? circle : ImageFiltered(
-      imageFilter: ui.ImageFilter.blur(sigmaX: 55, sigmaY: 55),
-      child: circle,
-    );
+    return reduced
+        ? circle
+        : ImageFiltered(
+            imageFilter: ui.ImageFilter.blur(sigmaX: 55, sigmaY: 55),
+            child: circle,
+          );
   }
 }
 
 class _Bubble {
-  _Bubble(this.r, this.x, this.y, this.vx, this.vy, this.phase, this.opacity, this.hue);
+  _Bubble(this.r, this.x, this.y, this.vx, this.vy, this.phase, this.opacity,
+      this.hue);
   double r, x, y, vx, vy, phase, opacity, hue;
- }
+}
 
 class _Ripple {
   _Ripple(this.x, this.y, this.radius);
@@ -2375,7 +3010,12 @@ class _WaterDroplet {
 }
 
 class BubbleField extends StatefulWidget {
-  const BubbleField({super.key, required this.accent, required this.gravityEnabled, required this.reduced, required this.speed});
+  const BubbleField(
+      {super.key,
+      required this.accent,
+      required this.gravityEnabled,
+      required this.reduced,
+      required this.speed});
   final Color accent;
   final bool gravityEnabled;
   final bool reduced;
@@ -2384,7 +3024,8 @@ class BubbleField extends StatefulWidget {
   State<BubbleField> createState() => _BubbleFieldState();
 }
 
-class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStateMixin {
+class _BubbleFieldState extends State<BubbleField>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _ticker;
   final math.Random _random = math.Random();
   final List<_Bubble> _bubbles = <_Bubble>[];
@@ -2402,8 +3043,10 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _ticker = AnimationController(vsync: this, duration: const Duration(days: 1))
-      ..addListener(_advance)..repeat();
+    _ticker =
+        AnimationController(vsync: this, duration: const Duration(days: 1))
+          ..addListener(_advance)
+          ..repeat();
     _sensor = accelerometerEventStream().listen((event) {
       // Calibrate the resting phone orientation so bubbles stay buoyant
       // when the phone is still and react only to changes in tilt.
@@ -2417,11 +3060,19 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
 
   _Bubble _createBubble({double? y}) {
     final radius = 11 + _random.nextDouble() * (widget.reduced ? 23 : 33);
-    final hue = HSLColor.fromColor(widget.accent).hue + _random.nextDouble() * 24 - 12;
-    return _Bubble(radius, radius + _random.nextDouble() * math.max(1.0, _size.width - radius * 2).toDouble(),
-      y ?? _size.height + radius, (_random.nextDouble() - .5) * 1.2,
-      -.3 - _random.nextDouble() * 1.1, _random.nextDouble() * math.pi * 2,
-      .22 + _random.nextDouble() * .30, hue);
+    final hue =
+        HSLColor.fromColor(widget.accent).hue + _random.nextDouble() * 24 - 12;
+    return _Bubble(
+        radius,
+        radius +
+            _random.nextDouble() *
+                math.max(1.0, _size.width - radius * 2).toDouble(),
+        y ?? _size.height + radius,
+        (_random.nextDouble() - .5) * 1.2,
+        -.3 - _random.nextDouble() * 1.1,
+        _random.nextDouble() * math.pi * 2,
+        .22 + _random.nextDouble() * .30,
+        hue);
   }
 
   void _advance() {
@@ -2431,7 +3082,9 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
     // on every display tick. Full mode keeps the normal frame rate.
     if (widget.reduced && now - _lastReducedFrame < 33333) return;
     if (widget.reduced) _lastReducedFrame = now;
-    final dt = _lastTick == 0 ? 1.0 : ((now - _lastTick) / 16667).clamp(0.0, 2.0).toDouble();
+    final dt = _lastTick == 0
+        ? 1.0
+        : ((now - _lastTick) / 16667).clamp(0.0, 2.0).toDouble();
     _lastTick = now;
     final count = widget.reduced ? 5 : (_size.width < 520 ? 20 : 28);
     while (_bubbles.length < count) {
@@ -2448,7 +3101,8 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
         b.vy += _gravity.dy * .11 * dt - (.025 + b.r / 6500) * dt;
       } else {
         // Organic idle motion: buoyancy, lateral sway and fluid drift.
-        b.vx += math.sin(b.phase) * .045 * dt + (_random.nextDouble() - .5) * .022 * dt;
+        b.vx += math.sin(b.phase) * .045 * dt +
+            (_random.nextDouble() - .5) * .022 * dt;
         b.vy += math.cos(b.phase * .73) * .018 * dt - (.018 + b.r / 6500) * dt;
       }
       if (_finger != null) {
@@ -2466,8 +3120,14 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
       b.x += b.vx * dt * 2.2 * widget.speed;
       b.y += b.vy * dt * 2.2 * widget.speed;
 
-      if (b.x < b.r) { b.x = b.r; b.vx = b.vx.abs() * .86; }
-      if (b.x > _size.width - b.r) { b.x = _size.width - b.r; b.vx = -b.vx.abs() * .86; }
+      if (b.x < b.r) {
+        b.x = b.r;
+        b.vx = b.vx.abs() * .86;
+      }
+      if (b.x > _size.width - b.r) {
+        b.x = _size.width - b.r;
+        b.vx = -b.vx.abs() * .86;
+      }
       // Bubbles rise out through the top and respawn below the screen.
       // Bouncing them off the top trapped them at the ceiling and stopped
       // the intended continuous underwater flow.
@@ -2477,7 +3137,7 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
       }
     }
 
-     if (!widget.reduced) {
+    if (!widget.reduced) {
       for (var i = 0; i < _bubbles.length; i++) {
         for (var j = i + 1; j < _bubbles.length; j++) {
           final a = _bubbles[i], b = _bubbles[j];
@@ -2487,13 +3147,17 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
           if (distance > .01 && distance < minDistance) {
             final nx = dx / distance, ny = dy / distance;
             final overlap = (minDistance - distance) * .5;
-            a.x -= nx * overlap; a.y -= ny * overlap;
-            b.x += nx * overlap; b.y += ny * overlap;
+            a.x -= nx * overlap;
+            a.y -= ny * overlap;
+            b.x += nx * overlap;
+            b.y += ny * overlap;
             final relative = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
             if (relative < 0) {
               final impulse = -(1 + .82) * relative * .5;
-              a.vx -= impulse * nx; a.vy -= impulse * ny;
-              b.vx += impulse * nx; b.vy += impulse * ny;
+              a.vx -= impulse * nx;
+              a.vy -= impulse * ny;
+              b.vx += impulse * nx;
+              b.vy += impulse * ny;
             }
           }
         }
@@ -2510,8 +3174,8 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
       final high = math.max(ripple.previousRadius, ringRadius);
       for (final bubble in _bubbles) {
         if (ripple.affected.contains(bubble)) continue;
-        final distance = (Offset(bubble.x, bubble.y) -
-            Offset(ripple.x, ripple.y)).distance;
+        final distance =
+            (Offset(bubble.x, bubble.y) - Offset(ripple.x, ripple.y)).distance;
         if (distance + bubble.r >= low && distance - bubble.r <= high) {
           ripple.affected.add(bubble);
           final dx = bubble.x - ripple.x;
@@ -2572,8 +3236,8 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
     ));
     final particleCount = widget.reduced ? 7 : 16;
     for (var i = 0; i < particleCount; i++) {
-      final angle = (math.pi * 2 * i / particleCount) +
-          (_random.nextDouble() - .5) * .32;
+      final angle =
+          (math.pi * 2 * i / particleCount) + (_random.nextDouble() - .5) * .32;
       final speed = .65 + _random.nextDouble() * 1.65;
       _droplets.add(_WaterDroplet(
         b.x,
@@ -2600,8 +3264,11 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
     final bytes = Uint8List(44 + sampleCount * 2);
     final data = ByteData.sublistView(bytes);
     void putText(int offset, String value) {
-      for (var i = 0; i < value.length; i++) { bytes[offset + i] = value.codeUnitAt(i); }
+      for (var i = 0; i < value.length; i++) {
+        bytes[offset + i] = value.codeUnitAt(i);
+      }
     }
+
     putText(0, 'RIFF');
     data.setUint32(4, 36 + sampleCount * 2, Endian.little);
     putText(8, 'WAVE');
@@ -2619,7 +3286,8 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
       final t = i / sampleRate;
       final envelope = math.exp(-18 * t);
       final frequency = 650 - 360 * (i / sampleCount);
-      final sample = (math.sin(2 * math.pi * frequency * t) * envelope * 9000).round();
+      final sample =
+          (math.sin(2 * math.pi * frequency * t) * envelope * 9000).round();
       data.setInt16(44 + i * 2, sample, Endian.little);
     }
     return bytes;
@@ -2640,13 +3308,15 @@ class _BubbleFieldState extends State<BubbleField> with SingleTickerProviderStat
   }
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(builder: (context, constraints) {
-    _size = Size(constraints.maxWidth, constraints.maxHeight);
-    return RepaintBoundary(child: CustomPaint(
-      painter: _BubblePainter(_bubbles, _ripples, _droplets, _ticker),
-      size: Size.infinite,
-    ));
-  });
+  Widget build(BuildContext context) =>
+      LayoutBuilder(builder: (context, constraints) {
+        _size = Size(constraints.maxWidth, constraints.maxHeight);
+        return RepaintBoundary(
+            child: CustomPaint(
+          painter: _BubblePainter(_bubbles, _ripples, _droplets, _ticker),
+          size: Size.infinite,
+        ));
+      });
 }
 
 class _BubblePainter extends CustomPainter {
@@ -2664,43 +3334,57 @@ class _BubblePainter extends CustomPainter {
       final paint = Paint()
         ..style = PaintingStyle.stroke
         ..strokeWidth = (2.2 * ripple.life).clamp(.45, 2.2)
-        ..color = const Color(0xFFB8FFF8).withOpacity(.58 * ripple.life);
+        ..color = const Color(0xFFB8FFF8).withValues(alpha: .58 * ripple.life);
       canvas.drawCircle(Offset(ripple.x, ripple.y), radius, paint);
-      canvas.drawCircle(Offset(ripple.x, ripple.y), radius * .985, Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = .65
-        ..color = Colors.white.withOpacity(.24 * ripple.life));
+      canvas.drawCircle(
+          Offset(ripple.x, ripple.y),
+          radius * .985,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = .65
+            ..color = Colors.white.withValues(alpha: .24 * ripple.life));
     }
     for (final drop in droplets) {
-      final color = HSLColor.fromAHSL(
-        drop.life.clamp(0.0, 1.0), drop.hue % 360, .82, .72).toColor();
+      final color =
+          HSLColor.fromAHSL(drop.life.clamp(0.0, 1.0), drop.hue % 360, .82, .72)
+              .toColor();
       canvas.drawCircle(Offset(drop.x, drop.y), drop.radius * drop.life,
-        Paint()..color = color);
-      canvas.drawCircle(Offset(drop.x, drop.y), drop.radius * drop.life,
-        Paint()..style = PaintingStyle.stroke..strokeWidth = .6
-          ..color = Colors.white.withOpacity(.55 * drop.life));
+          Paint()..color = color);
+      canvas.drawCircle(
+          Offset(drop.x, drop.y),
+          drop.radius * drop.life,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = .6
+            ..color = Colors.white.withValues(alpha: .55 * drop.life));
     }
     for (final b in bubbles) {
       final bubbleRadius = b.r;
       final bubbleOpacity = b.opacity;
       final color = HSLColor.fromAHSL(1, b.hue % 360, .78, .60).toColor();
-      final rect = Rect.fromCircle(center: Offset(b.x, b.y), radius: bubbleRadius);
+      final rect =
+          Rect.fromCircle(center: Offset(b.x, b.y), radius: bubbleRadius);
       final paint = Paint()
         ..shader = RadialGradient(
           center: const Alignment(-.34, -.38),
           colors: [
-            Colors.white.withOpacity(bubbleOpacity * .95),
-            color.withOpacity(bubbleOpacity * .62),
-            color.withOpacity(bubbleOpacity * .10),
+            Colors.white.withValues(alpha: bubbleOpacity * .95),
+            color.withValues(alpha: bubbleOpacity * .62),
+            color.withValues(alpha: bubbleOpacity * .10),
           ],
         ).createShader(rect);
       canvas.drawCircle(Offset(b.x, b.y), bubbleRadius, paint);
-      canvas.drawCircle(Offset(b.x, b.y), bubbleRadius, Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.15
-        ..color = Colors.white.withOpacity(bubbleOpacity * .9));
-      canvas.drawCircle(Offset(b.x - bubbleRadius * .34, b.y - bubbleRadius * .38), bubbleRadius * .17,
-        Paint()..color = Colors.white.withOpacity(bubbleOpacity * .9));
+      canvas.drawCircle(
+          Offset(b.x, b.y),
+          bubbleRadius,
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.15
+            ..color = Colors.white.withValues(alpha: bubbleOpacity * .9));
+      canvas.drawCircle(
+          Offset(b.x - bubbleRadius * .34, b.y - bubbleRadius * .38),
+          bubbleRadius * .17,
+          Paint()..color = Colors.white.withValues(alpha: bubbleOpacity * .9));
     }
   }
 
@@ -2709,7 +3393,8 @@ class _BubblePainter extends CustomPainter {
 }
 
 class _SecretBoxGesturePainter extends CustomPainter {
-  _SecretBoxGesturePainter(List<Offset> points) : points = List<Offset>.of(points);
+  _SecretBoxGesturePainter(List<Offset> points)
+      : points = List<Offset>.of(points);
   final List<Offset> points;
 
   @override
@@ -2719,22 +3404,25 @@ class _SecretBoxGesturePainter extends CustomPainter {
     for (final point in points.skip(1)) {
       path.lineTo(point.dx, point.dy);
     }
-    canvas.drawPath(path, Paint()
-      ..color = const Color(0x665DEBFF)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 8
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7));
-    canvas.drawPath(path, Paint()
-      ..color = const Color(0xD6B8F8FF)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round);
+    canvas.drawPath(
+        path,
+        Paint()
+          ..color = const Color(0x665DEBFF)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 8
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7));
+    canvas.drawPath(
+        path,
+        Paint()
+          ..color = const Color(0xD6B8F8FF)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2.2
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round);
   }
 
   @override
   bool shouldRepaint(covariant _SecretBoxGesturePainter oldDelegate) => true;
 }
-
